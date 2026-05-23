@@ -524,14 +524,6 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="modal-validating">
-        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
-            <div class="spinner" style="margin: 0 auto 20px auto; border-color: var(--border-color); border-top-color: var(--accent);"></div>
-            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento...</h3>
-            <p style="font-size: 12px; color: var(--text-light); line-height: 1.5;">Se a sua compra for validada, notificaremos você por aqui em instantes.</p>
-        </div>
-    </div>
-
     <div class="modal-overlay" id="modal-post-pay-1">
         <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
             <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
@@ -714,6 +706,8 @@
         window.addEventListener('scroll', updateActivity);
         window.addEventListener('touchstart', updateActivity);
 
+        function saveCartToLocal() { localStorage.setItem('savedCart', JSON.stringify(userCart)); }
+
         // CARROSSEL HERO VARIÁVEIS
         let heroImages = [];
         let currentHeroSlide = 0;
@@ -752,7 +746,7 @@
         }
 
         function processGuest() { activeUser = null; localStorage.removeItem(STORAGE_KEY); showLoading("Acessando Loja..."); setTimeout(() => enterApp(false), 500); }
-        function logout() { closeModal('modal-user-profile'); activeUser = null; isDeveloper = false; userCart = []; updateCartBadges(); localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); document.getElementById('login-user').value = ''; document.getElementById('login-pass').value = ''; switchView('view-login'); }
+        function logout() { closeModal('modal-user-profile'); activeUser = null; isDeveloper = false; userCart = []; saveCartToLocal(); updateCartBadges(); localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); document.getElementById('login-user').value = ''; document.getElementById('login-pass').value = ''; switchView('view-login'); }
 
         function processRegister() {
             const u = document.getElementById('reg-user').value.toLowerCase().trim();
@@ -945,6 +939,7 @@
                 });
                 showMessage("Adicionado à sacola!");
             }
+            saveCartToLocal();
             updateCartBadges();
             closeModal('modal-product-details');
         }
@@ -988,8 +983,8 @@
             updateCartTotal();
         }
 
-        function toggleCartItem(index) { userCart[index].selected = !userCart[index].selected; updateCartTotal(); }
-        function removeFromCart(index) { userCart.splice(index, 1); updateCartBadges(); renderCartItems(); }
+        function toggleCartItem(index) { userCart[index].selected = !userCart[index].selected; saveCartToLocal(); updateCartTotal(); }
+        function removeFromCart(index) { userCart.splice(index, 1); saveCartToLocal(); updateCartBadges(); renderCartItems(); }
 
         function updateCartTotal() {
             let total = 0;
@@ -1059,7 +1054,8 @@
                 return;
             }
 
-            showLoading("Aguardando redirecionamento seguro...");
+            // GUARDA O CARRINHO ANTES DE SAIR DA PÁGINA PARA NÃO PERDER NA VOLTA
+            saveCartToLocal();
 
             const itemsForMP = selected.map(item => {
                 const price = item.hasVariants ? item.selectedVariantData.price : item.price;
@@ -1097,88 +1093,147 @@
             .then(res => res.json())
             .then(data => {
                 if(data.init_point) { window.location.href = data.init_point; } 
-                else { hideLoading(); showMessage("Erro ao gerar link do Mercado Pago."); }
+                else { showMessage("Erro ao gerar link do Mercado Pago."); }
             })
-            .catch(err => { hideLoading(); showMessage("Erro de conexão com Mercado Pago."); });
+            .catch(err => { showMessage("Erro de conexão com Mercado Pago."); });
         }
 
-        // Verificação Silenciosa no Retorno e Tranca da Página
+        // --- MOTOR DE VERIFICAÇÃO OCULTA DE 5 MINUTOS ---
         function checkPostPaymentRedirect() {
             const urlParams = new URLSearchParams(window.location.search);
-            const status = urlParams.get('collection_status') || urlParams.get('status');
             const fromMp = urlParams.get('from_mp');
+            const collectionId = urlParams.get('collection_id') || urlParams.get('payment_id');
 
-            const pendingStatus = localStorage.getItem('lastPaymentStatus');
-            const notiBtn = document.getElementById('noti-btn');
-
-            if((fromMp === 'true' || status != null) && activeUser) {
-                
-                // Limpa a URL na hora para não repetir o loop se atualizar
+            if(fromMp === 'true' && activeUser) {
+                // Remove a tag da URL para ficar elegante e não repetir
                 window.history.replaceState({}, document.title, window.location.pathname);
 
-                // Exibe modal bloqueando a tela (Tempo Psicológico de 15 Segundos)
-                document.getElementById('modal-validating').classList.add('active');
-                
-                // Exibe o botão de notificação cinza
-                notiBtn.className = 'floating-noti pending';
-                notiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
-                notiBtn.style.display = 'flex';
+                // Dispara o cronómetro oculto de 5 Minutos (300000 ms)
+                localStorage.setItem('paymentVerifyStart', Date.now().toString());
+                localStorage.setItem('pendingPaymentId', collectionId || 'none');
 
-                let finalStatus = 'rejected';
-                
-                // ACEITA APENAS SE FOR APROVADO, EM PROCESSAMENTO OU PENDENTE (PIX)
-                if (status === 'approved' || status === 'pending' || status === 'in_process' || status === 'authorized') {
-                    finalStatus = 'approved';
-                    
-                    const purchasedItems = userCart.filter(item => item.selected);
-                    if (purchasedItems.length > 0) {
-                        const orderId = 'MB-' + Date.now().toString().slice(-6); 
-                        let totalVal = 0;
-                        purchasedItems.forEach(i => {
-                            const price = i.hasVariants ? i.selectedVariantData.price : i.price;
-                            totalVal += (parsePriceBR(price) * i.quantity);
-                        });
-                        const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-                        if(db) {
-                            db.ref('orders/' + orderId).set({
-                                orderId: orderId,
-                                userId: activeUser.username,
-                                userName: activeUser.name,
-                                items: purchasedItems,
-                                total: totalFmt,
-                                timestamp: Date.now(),
-                                phone: activeUser.phone || '',
-                                whatsapp: true,
-                                status: status,
-                                visibleToAdmin: false // Escondido da Desenvolvedora por enquanto!
-                            });
-                        }
-
-                        localStorage.setItem('tempOrderId', orderId); // Prende no LocalStorage para não perder
-                        userCart = userCart.filter(item => !item.selected);
-                        updateCartBadges();
-                    }
+                // Guarda os itens pendentes
+                const purchasedItems = userCart.filter(item => item.selected);
+                if (purchasedItems.length > 0) {
+                    localStorage.setItem('tempCartItems', JSON.stringify(purchasedItems));
+                    userCart = userCart.filter(item => !item.selected);
+                    saveCartToLocal();
+                    updateCartBadges();
                 }
-                
-                localStorage.setItem('lastPaymentStatus', finalStatus);
 
-                // Gira por 15 Segundos
-                setTimeout(() => { 
-                    document.getElementById('modal-validating').classList.remove('active');
-                    notiBtn.className = 'floating-noti active';
-                    notiBtn.innerHTML = '<div class="noti-badge">1</div><i class="fa-solid fa-bell"></i> 1 Notificação';
-                }, 15000); 
+                showMessage("A verificar pagamento em segundo plano...");
+                showPendingNotification();
+                scheduleVerification();
 
-            } else if (pendingStatus && activeUser) {
-                // Se ele recarregar a página antes de clicar, salva a notificação
-                notiBtn.className = 'floating-noti active';
-                notiBtn.innerHTML = '<div class="noti-badge">1</div><i class="fa-solid fa-bell"></i> 1 Notificação';
-                notiBtn.style.display = 'flex';
+            } else if (localStorage.getItem('paymentVerifyStart') && activeUser) {
+                showPendingNotification();
+                scheduleVerification();
+            } else if (localStorage.getItem('lastPaymentStatus') && activeUser) {
+                showActiveNotification();
             }
         }
 
-        // Quando clica no botão Flutuante de Notificação
+        function showPendingNotification() {
+            const notiBtn = document.getElementById('noti-btn');
+            notiBtn.className = 'floating-noti pending';
+            notiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
+            notiBtn.style.display = 'flex';
+        }
+
+        function showActiveNotification() {
+            const notiBtn = document.getElementById('noti-btn');
+            notiBtn.className = 'floating-noti active';
+            notiBtn.innerHTML = '<div class="noti-badge">1</div><i class="fa-solid fa-bell"></i> 1 Notificação';
+            notiBtn.style.display = 'flex';
+        }
+
+        function scheduleVerification() {
+            const start = parseInt(localStorage.getItem('paymentVerifyStart'));
+            const elapsed = Date.now() - start;
+            const waitTime = 5 * 60 * 1000; // 5 minutos = 300000 milissegundos
+
+            if (elapsed >= waitTime) {
+                executeVerification();
+            } else {
+                setTimeout(executeVerification, waitTime - elapsed);
+            }
+        }
+
+        // Bate no Mercado Pago para saber a verdade
+        async function executeVerification() {
+            if (!localStorage.getItem('paymentVerifyStart')) return; 
+
+            const paymentId = localStorage.getItem('pendingPaymentId');
+            let finalStatus = 'rejected';
+
+            if (paymentId && paymentId !== 'none' && paymentId !== 'null') {
+                try {
+                    const res = await fetch('https://api.mercadopago.com/v1/payments/' + paymentId, {
+                        headers: { 'Authorization': 'Bearer APP_USR-492975771390927-043013-9e07faa7f6b49f56b1a945784258a057-1370551812' }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'approved') {
+                        finalStatus = 'approved';
+                    }
+                } catch (e) {
+                    console.error("Erro MP:", e);
+                }
+            }
+
+            localStorage.removeItem('paymentVerifyStart');
+            localStorage.removeItem('pendingPaymentId');
+            localStorage.setItem('lastPaymentStatus', finalStatus);
+
+            if (finalStatus === 'approved') {
+                const itemsJson = localStorage.getItem('tempCartItems');
+                if (itemsJson) {
+                    const purchasedItems = JSON.parse(itemsJson);
+                    const orderId = 'MB-' + Date.now().toString().slice(-6); 
+                    let totalVal = 0;
+                    purchasedItems.forEach(i => {
+                        const price = i.hasVariants ? i.selectedVariantData.price : i.price;
+                        totalVal += (parsePriceBR(price) * i.quantity);
+                    });
+                    const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                    if(db) {
+                        db.ref('orders/' + orderId).set({
+                            orderId: orderId,
+                            userId: activeUser.username,
+                            userName: activeUser.name,
+                            items: purchasedItems,
+                            total: totalFmt,
+                            timestamp: Date.now(),
+                            phone: activeUser.phone || '',
+                            whatsapp: true,
+                            status: 'paid',
+                            visibleToAdmin: false // Escondido da Desenvolvedora até concluir o fluxo!
+                        });
+                    }
+
+                    localStorage.setItem('tempOrderId', orderId);
+                    localStorage.removeItem('tempCartItems');
+                }
+            } else {
+                // Devolve os itens para a sacola caso tenha dado erro ou desistido
+                const itemsJson = localStorage.getItem('tempCartItems');
+                if (itemsJson) {
+                    const failedItems = JSON.parse(itemsJson);
+                    failedItems.forEach(item => {
+                        item.selected = false;
+                        userCart.push(item);
+                    });
+                    saveCartToLocal();
+                    updateCartBadges();
+                    if(document.getElementById('view-cart').classList.contains('active')) renderCartItems();
+                    localStorage.removeItem('tempCartItems');
+                }
+            }
+
+            showActiveNotification();
+        }
+
+        // Quando clica no botão Flutuante de Notificação pós-verificação
         function startPostPaymentFlow() {
             document.getElementById('noti-btn').style.display = 'none';
             const status = localStorage.getItem('lastPaymentStatus');
@@ -1228,7 +1283,6 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
             }
             
-            // Limpa tudo da memória
             localStorage.removeItem('lastPaymentStatus');
             localStorage.removeItem('tempOrderId');
             
@@ -1249,8 +1303,8 @@
                 const orders = snap.val();
                 if(!orders) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda encontrada.</p>'; return; }
                 
-                // Filtra as que estão com visibleToAdmin === true (Significa que concluiu os passos todos)
-                const sorted = Object.values(orders).filter(o => o.visibleToAdmin === true).sort((a,b) => b.timestamp - a.timestamp);
+                // Filtra as que NÃO estão com visibleToAdmin = false
+                const sorted = Object.values(orders).filter(o => o.visibleToAdmin !== false).sort((a,b) => b.timestamp - a.timestamp);
                 
                 if(sorted.length === 0) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda concluída ainda.</p>'; return; }
 
@@ -1646,13 +1700,20 @@
         function finishSave() { hideLoading(); closeModal('modal-form'); showMessage("Salvo com sucesso!"); }
 
         function checkSession() {
+            // Recupera a sacola salva na memória do navegador
+            const savedCart = localStorage.getItem('savedCart');
+            if (savedCart) {
+                try { userCart = JSON.parse(savedCart); } catch(e) {}
+                updateCartBadges();
+            }
+
             const storedUser = localStorage.getItem(STORAGE_KEY); const lastActivity = localStorage.getItem(ACTIVITY_KEY);
             if (storedUser && lastActivity) {
                 const timePassed = Date.now() - parseInt(lastActivity);
                 if (timePassed > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } 
                 else { activeUser = JSON.parse(storedUser); updateActivity(); enterApp(activeUser.role === 'admin'); }
             }
-            // Aciona a verificação da volta do Mercado Pago
+            
             checkPostPaymentRedirect(); 
         }
 
