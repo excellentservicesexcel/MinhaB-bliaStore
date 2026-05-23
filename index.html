@@ -506,6 +506,14 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-validating">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <div class="spinner" style="margin: 0 auto 20px auto; border-color: var(--border-color); border-top-color: var(--accent);"></div>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento</h3>
+            <p style="font-size: 12px; color: var(--text-light); line-height: 1.5;">Se a sua compra for validada, notificaremos você por aqui em instantes.</p>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-post-pay-1">
         <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
             <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
@@ -1017,13 +1025,12 @@
             const selected = userCart.filter(item => item.selected);
             if(selected.length === 0) { showMessage("Selecione pelo menos um item da sacola."); return; }
 
-            // Se for visitante, impede a compra e mostra modal
             if(!activeUser) {
                 document.getElementById('modal-auth-checkout').classList.add('active');
                 return;
             }
 
-            showLoading("Gerando pagamento...");
+            showLoading("A gerar pagamento...");
 
             const itemsForMP = selected.map(item => {
                 const price = item.hasVariants ? item.selectedVariantData.price : item.price;
@@ -1039,7 +1046,6 @@
                 };
             });
 
-            // Adiciona a flag ?from_mp=true para validar a volta
             const returnUrl = window.location.origin + window.location.pathname + "?from_mp=true";
 
             const mpData = {
@@ -1068,7 +1074,6 @@
             .catch(err => { hideLoading(); showMessage("Erro de conexão com Mercado Pago."); });
         }
 
-        // Função de Validação do Retorno
         function checkPostPaymentRedirect() {
             const urlParams = new URLSearchParams(window.location.search);
             const status = urlParams.get('collection_status');
@@ -1078,7 +1083,7 @@
                 const purchasedItems = userCart.filter(item => item.selected);
                 
                 if (purchasedItems.length > 0) {
-                    const orderId = 'MB-' + Date.now().toString().slice(-6); // Gerador de ID Curto
+                    const orderId = 'MB-' + Date.now().toString().slice(-6); 
                     let totalVal = 0;
                     purchasedItems.forEach(i => {
                         const price = i.hasVariants ? i.selectedVariantData.price : i.price;
@@ -1096,22 +1101,24 @@
                             timestamp: Date.now(),
                             phone: activeUser.phone || '',
                             whatsapp: true,
-                            status: 'paid'
+                            status: 'paid',
+                            visibleToAdmin: false // Esconde da desenvolvedora até o fim do fluxo
                         });
                     }
 
                     window.currentOrderId = orderId;
 
-                    // Limpa a sacola (apenas o que foi comprado)
                     userCart = userCart.filter(item => !item.selected);
                     updateCartBadges();
                     
-                    // Notificação Flutuante
-                    setTimeout(() => { showMessage("Se sua compra for validada notificaremos"); }, 1000);
-                    setTimeout(() => { document.getElementById('noti-btn').style.display = 'flex'; }, 4000);
+                    document.getElementById('modal-validating').classList.add('active');
+                    
+                    setTimeout(() => { 
+                        document.getElementById('modal-validating').classList.remove('active');
+                        document.getElementById('noti-btn').style.display = 'flex'; 
+                    }, 4000);
                 }
 
-                // Limpa a URL para não refazer o processo se a página atualizar
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         }
@@ -1134,7 +1141,8 @@
             if(window.currentOrderId && db) {
                 db.ref('orders/' + window.currentOrderId).update({
                     phone: phone,
-                    whatsapp: isWpp
+                    whatsapp: isWpp,
+                    visibleToAdmin: true // Agora aparece na comanda!
                 });
             }
 
@@ -1156,7 +1164,7 @@
             if(!isDeveloper) return;
             document.getElementById('modal-admin-orders').classList.add('active');
             const list = document.getElementById('admin-orders-list');
-            list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Carregando comandas...</p>';
+            list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">A carregar comandas...</p>';
 
             if(!db) return;
 
@@ -1165,8 +1173,10 @@
                 const orders = snap.val();
                 if(!orders) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda encontrada.</p>'; return; }
                 
-                const sorted = Object.values(orders).sort((a,b) => b.timestamp - a.timestamp);
+                const sorted = Object.values(orders).filter(o => o.visibleToAdmin !== false).sort((a,b) => b.timestamp - a.timestamp);
                 
+                if(sorted.length === 0) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda verificada.</p>'; return; }
+
                 sorted.forEach(o => {
                     const date = new Date(o.timestamp).toLocaleString('pt-BR');
                     let itemsHtml = '';
@@ -1246,7 +1256,7 @@
             if(!n) { showMessage("Nome não pode ficar vazio."); return; }
             let updateData = { name: n, phone: ph }; if(pass) updateData.password = pass;
 
-            showLoading("Salvando...");
+            showLoading("A guardar...");
             const finishUpdate = () => {
                 if(activeUser.username === 'andressa' && !db) {
                     activeUser.name = n; activeUser.phone = ph; if(updateData.profilePic) activeUser.profilePic = updateData.profilePic;
@@ -1543,7 +1553,7 @@
             const canvas = cropper.getCroppedCanvas({ width: canvasWidth, height: canvasHeight, fillColor: '#fff' });
             if (!canvas) { showMessage("Erro na imagem."); return; }
 
-            showLoading("Salvando...");
+            showLoading("A guardar...");
             const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
             if(uploadMode === 'hero') { db.ref('store/heroImages').push(base64Image).then(() => finishSave()).catch(() => { hideLoading(); showMessage("Erro ao salvar capa."); }); } 
@@ -1565,7 +1575,7 @@
                 if (timePassed > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } 
                 else { activeUser = JSON.parse(storedUser); updateActivity(); enterApp(activeUser.role === 'admin'); }
             }
-            checkPostPaymentRedirect(); // Aciona a verificação da volta do Mercado Pago
+            checkPostPaymentRedirect(); 
         }
 
         setInterval(() => { if (activeUser) { const lastActivity = localStorage.getItem(ACTIVITY_KEY); if (lastActivity && Date.now() - parseInt(lastActivity) > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } } }, 60000); 
