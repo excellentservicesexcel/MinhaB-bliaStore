@@ -524,6 +524,14 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-validating">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <div class="spinner" style="margin: 0 auto 20px auto; border-color: var(--border-color); border-top-color: var(--accent);"></div>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento...</h3>
+            <p style="font-size: 12px; color: var(--text-light); line-height: 1.5;">Se a sua compra for validada, notificaremos você por aqui em instantes.</p>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-post-pay-1">
         <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
             <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
@@ -1098,7 +1106,7 @@
             .catch(err => { showMessage("Erro de conexão com Mercado Pago."); });
         }
 
-        // --- MOTOR DE VERIFICAÇÃO OCULTA DE 5 MINUTOS ---
+        // --- MOTOR DE VERIFICAÇÃO OCULTA DE 3 MINUTOS ---
         function checkPostPaymentRedirect() {
             const urlParams = new URLSearchParams(window.location.search);
             const fromMp = urlParams.get('from_mp');
@@ -1108,7 +1116,7 @@
                 // Remove a tag da URL para ficar elegante e não repetir
                 window.history.replaceState({}, document.title, window.location.pathname);
 
-                // Dispara o cronómetro oculto de 5 Minutos (300000 ms)
+                // Dispara o cronómetro oculto de 3 Minutos (180000 ms)
                 localStorage.setItem('paymentVerifyStart', Date.now().toString());
                 localStorage.setItem('pendingPaymentId', collectionId || 'none');
 
@@ -1150,7 +1158,7 @@
         function scheduleVerification() {
             const start = parseInt(localStorage.getItem('paymentVerifyStart'));
             const elapsed = Date.now() - start;
-            const waitTime = 5 * 60 * 1000; // 5 minutos = 300000 milissegundos
+            const waitTime = 3 * 60 * 1000; // 3 minutos = 180000 milissegundos
 
             if (elapsed >= waitTime) {
                 executeVerification();
