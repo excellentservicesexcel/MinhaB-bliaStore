@@ -85,10 +85,7 @@
         .is-dev .hero-img:hover::after { opacity: 1; }
 
         @media (min-width: 992px) { 
-            .hero { flex-direction: row; align-items: center; } 
-            .hero-text { flex: 1; text-align: left; padding-left: 5%; margin: 0; } 
-            .hero-subtitle { justify-content: flex-start; } 
-            .hero-img-wrapper { flex: 1.5; }
+            .hero-text { max-width: 800px; margin: 0 auto; padding: 60px 5%; } 
         }
 
         /* --- SECTION TITLES --- */
@@ -376,6 +373,14 @@
         </div>
     </main>
 
+    <main id="view-sobre" class="view">
+        <header class="header" style="padding: 15px 5%; justify-content: flex-start; gap: 20px;">
+            <button type="button" class="btn-back" onclick="goHome()" style="margin: 0;"><i class="fa-solid fa-arrow-left"></i> Voltar</button>
+            <h2 class="serif" style="font-size: 18px; color: var(--primary); text-transform: uppercase;">Sobre Nós</h2>
+        </header>
+        <div id="sobre-nos-content" style="padding: 40px 5%; max-width: 800px; margin: 0 auto; min-height: 60vh;"></div>
+    </main>
+
     <main id="view-shop" class="view">
         <header class="header">
             <div class="logo-area" onclick="document.location.reload()">
@@ -385,10 +390,15 @@
                     <span class="logo-text-sub">STORE</span>
                 </div>
             </div>
-            <div class="nav-links"><span>Início</span><span>Loja</span><span>Coleções</span><span>Conjuntos</span><span>Sobre Nós</span><span>Contato</span></div>
+            <div class="nav-links">
+                <span onclick="showAllProducts()">Loja</span>
+                <span onclick="scrollToCategories()">Coleções</span>
+                <span onclick="showSobreNos()">Sobre Nós</span>
+                <span onclick="openContatoModal()">Contato</span>
+            </div>
             <div class="header-actions">
                 <div class="header-icons">
-                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <i class="fa-solid fa-book-bible" style="cursor:pointer;" onclick="window.location.href='https://excellentservicesexcel.github.io/B-bliaEXS/'"></i>
                     <div style="position: relative; display: inline-flex; align-items: center;">
                         <i class="fa-solid fa-bag-shopping" style="cursor: pointer;" onclick="openCartView()"></i>
                         <div id="cart-badge" style="display: none; position: absolute; top: -6px; right: -8px; background: #d9534f; color: white; font-size: 9px; font-family: 'Inter', sans-serif; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; align-items: center; justify-content: center; pointer-events: none;">0</div>
@@ -524,11 +534,15 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="modal-validating">
-        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
-            <div class="spinner" style="margin: 0 auto 20px auto; border-color: var(--border-color); border-top-color: var(--accent);"></div>
-            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento...</h3>
-            <p style="font-size: 12px; color: var(--text-light); line-height: 1.5;">Se a sua compra for validada, notificaremos você por aqui em instantes.</p>
+    <div class="modal-overlay" id="modal-contato" onclick="closeModal('modal-contato')">
+        <div class="modal-content" style="max-width: 320px; text-align: center; padding: 40px 30px;" onclick="event.stopPropagation()">
+            <button type="button" class="btn-close" onclick="closeModal('modal-contato')" style="position: absolute; top: 15px; right: 15px;"><i class="fa-solid fa-xmark"></i></button>
+            <i class="fa-solid fa-address-card" style="font-size: 40px; color: var(--accent); margin-bottom: 20px;"></i>
+            <h3 class="serif" style="color: var(--primary); margin-bottom: 10px;">Fale Conosco</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px;">Estamos prontos para te atender e tirar todas as suas dúvidas!</p>
+            <a href="https://wa.me/5515991422218" target="_blank" class="btn-gold" style="display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; padding: 15px; border-radius: 8px;">
+                <i class="fa-brands fa-whatsapp" style="font-size: 18px;"></i> (15) 99142-2218
+            </a>
         </div>
     </div>
 
@@ -701,6 +715,7 @@
         
         let selectedProductVariant = null; 
         let currentProductQuantity = 1;
+        let aboutBlocks = [];
 
         // --- SISTEMA DE SESSÃO PERSISTENTE E INATIVIDADE ---
         const STORAGE_KEY = 'minha_biblia_user';
@@ -730,6 +745,10 @@
             const catSection = document.getElementById('categorias-section');
             if (catSection) { const y = catSection.getBoundingClientRect().top + window.scrollY - 80; window.scrollTo({top: y, behavior: 'smooth'}); }
         }
+
+        // --- NAVEGAÇÃO EXTRA ---
+        function openContatoModal() { document.getElementById('modal-contato').classList.add('active'); }
+        function showSobreNos() { renderSobreNos(); switchView('view-sobre'); }
 
         // --- SISTEMA DE CONTAS ---
         function processLogin(e) {
@@ -823,6 +842,16 @@
             db.ref('store/heroImage').once('value').then(snap => { if(snap.val() && heroImages.length === 0) { heroImages.push({id: 'legacy', url: snap.val()}); renderHeroCarousel(); } });
             db.ref('categories').on('value', snap => { localCategories = []; if(snap.val()) Object.keys(snap.val()).forEach(k => localCategories.push({id: k, ...snap.val()[k]})); renderCategories(); renderHighlights(); });
             db.ref('products').on('value', snap => { localProducts = []; if(snap.val()) Object.keys(snap.val()).forEach(k => localProducts.push({id: k, ...snap.val()[k]})); renderHighlights(); });
+            
+            // Dados da aba Sobre Nós
+            db.ref('store/aboutBlocks').on('value', snap => {
+                aboutBlocks = [];
+                if(snap.val()) {
+                    const data = snap.val();
+                    Object.keys(data).forEach(k => aboutBlocks.push({id: k, ...data[k]}));
+                }
+                if(document.getElementById('view-sobre').classList.contains('active')) renderSobreNos();
+            });
         }
 
         function renderHeroCarousel() {
@@ -1045,7 +1074,7 @@
                             localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
                             enterApp(false);
                             closeModal('modal-auth-checkout');
-                            processCheckout(); // Continua o fluxo automaticamente
+                            processCheckout(); 
                         });
                     }
                 });
@@ -1062,7 +1091,6 @@
                 return;
             }
 
-            // GUARDA O CARRINHO ANTES DE SAIR DA PÁGINA PARA NÃO PERDER NA VOLTA
             saveCartToLocal();
 
             const itemsForMP = selected.map(item => {
@@ -1113,14 +1141,11 @@
             const collectionId = urlParams.get('collection_id') || urlParams.get('payment_id');
 
             if(fromMp === 'true' && activeUser) {
-                // Remove a tag da URL para ficar elegante e não repetir
                 window.history.replaceState({}, document.title, window.location.pathname);
 
-                // Dispara o cronómetro oculto de 3 Minutos (180000 ms)
                 localStorage.setItem('paymentVerifyStart', Date.now().toString());
                 localStorage.setItem('pendingPaymentId', collectionId || 'none');
 
-                // Guarda os itens pendentes
                 const purchasedItems = userCart.filter(item => item.selected);
                 if (purchasedItems.length > 0) {
                     localStorage.setItem('tempCartItems', JSON.stringify(purchasedItems));
@@ -1158,7 +1183,7 @@
         function scheduleVerification() {
             const start = parseInt(localStorage.getItem('paymentVerifyStart'));
             const elapsed = Date.now() - start;
-            const waitTime = 3 * 60 * 1000; // 3 minutos = 180000 milissegundos
+            const waitTime = 3 * 60 * 1000; 
 
             if (elapsed >= waitTime) {
                 executeVerification();
@@ -1167,7 +1192,6 @@
             }
         }
 
-        // Bate no Mercado Pago para saber a verdade
         async function executeVerification() {
             if (!localStorage.getItem('paymentVerifyStart')) return; 
 
@@ -1215,7 +1239,7 @@
                             phone: activeUser.phone || '',
                             whatsapp: true,
                             status: 'paid',
-                            visibleToAdmin: false // Escondido da Desenvolvedora até concluir o fluxo!
+                            visibleToAdmin: false 
                         });
                     }
 
@@ -1223,7 +1247,6 @@
                     localStorage.removeItem('tempCartItems');
                 }
             } else {
-                // Devolve os itens para a sacola caso tenha dado erro ou desistido
                 const itemsJson = localStorage.getItem('tempCartItems');
                 if (itemsJson) {
                     const failedItems = JSON.parse(itemsJson);
@@ -1241,7 +1264,6 @@
             showActiveNotification();
         }
 
-        // Quando clica no botão Flutuante de Notificação pós-verificação
         function startPostPaymentFlow() {
             document.getElementById('noti-btn').style.display = 'none';
             const status = localStorage.getItem('lastPaymentStatus');
@@ -1275,7 +1297,7 @@
                 db.ref('orders/' + tempOrderId).update({
                     phone: phone,
                     whatsapp: isWpp,
-                    visibleToAdmin: true // AGORA SIM APARECE NA COMANDA DA ADMIN!
+                    visibleToAdmin: true 
                 });
             }
 
@@ -1311,7 +1333,6 @@
                 const orders = snap.val();
                 if(!orders) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda encontrada.</p>'; return; }
                 
-                // Filtra as que NÃO estão com visibleToAdmin = false
                 const sorted = Object.values(orders).filter(o => o.visibleToAdmin !== false).sort((a,b) => b.timestamp - a.timestamp);
                 
                 if(sorted.length === 0) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda concluída ainda.</p>'; return; }
@@ -1357,6 +1378,60 @@
                     `);
                 });
             });
+        }
+
+        // --- SISTEMA DA PÁGINA SOBRE NÓS ---
+        function renderSobreNos() {
+            const container = document.getElementById('sobre-nos-content');
+            let html = '';
+            
+            if (isDeveloper) {
+                html += `<div style="text-align:center; margin-bottom: 30px;"><button type="button" class="btn-gold" onclick="openModal('sobre-block')"><i class="fa-solid fa-plus"></i> Novo Bloco de Conteúdo</button></div>`;
+            }
+
+            aboutBlocks.forEach(b => {
+                let adminHtml = isDeveloper ? `<button type="button" class="btn-admin del" style="position:absolute; top:-10px; right:-10px; width:24px; height:24px; font-size:10px; z-index:10; box-shadow:0 2px 5px rgba(0,0,0,0.2);" onclick="deleteAboutBlock('${b.id}')"><i class="fa-solid fa-trash"></i></button>` : '';
+                
+                html += `<div style="position:relative; margin-bottom: 25px;">${adminHtml}`;
+                
+                if (b.type === 'text') {
+                    let fSize = b.style === 'title' ? '24px' : '14px';
+                    let fFam = b.style === 'title' ? "'Playfair Display', serif" : "'Inter', sans-serif";
+                    let color = b.style === 'title' ? 'var(--primary)' : 'var(--text-light)';
+                    html += `<div style="text-align:${b.align}; font-size:${fSize}; font-family:${fFam}; color:${color}; line-height:1.6; white-space:pre-wrap;">${b.content}</div>`;
+                } else if (b.type === 'image') {
+                    html += `<img src="${b.url}" style="width:100%; border-radius:8px; display:block;">`;
+                }
+                html += `</div>`;
+            });
+            
+            if(aboutBlocks.length === 0 && !isDeveloper) {
+                html += `<p style="text-align:center; color:var(--text-light);">Informações em breve.</p>`;
+            }
+            container.innerHTML = html;
+        }
+
+        window.deleteAboutBlock = function(id) {
+            if(confirm("Excluir este bloco?")) { db.ref('store/aboutBlocks/' + id).remove(); }
+        }
+
+        window.toggleSobreFields = function() {
+            const type = document.getElementById('sobre-type').value;
+            const textFields = document.getElementById('sobre-text-fields');
+            const uploadArea = document.getElementById('upload-placeholder');
+            const cropperArea = document.getElementById('cropper-wrapper');
+            const btnChange = document.getElementById('btn-change-photo');
+            
+            if (type === 'text') {
+                textFields.style.display = 'block';
+                uploadArea.style.display = 'none';
+                cropperArea.style.display = 'none';
+                btnChange.style.display = 'none';
+            } else {
+                textFields.style.display = 'none';
+                if(!cropper) uploadArea.style.display = 'flex';
+                else { cropperArea.style.display = 'block'; btnChange.style.display = 'block'; }
+            }
         }
 
 
@@ -1587,6 +1662,30 @@
                 document.getElementById('modal-title').innerText = mode === 'category' ? "Nova Categoria" : "Editar Categoria";
                 dynamicFields.innerHTML = `<input type="text" id="cat-name" class="input-modern" placeholder="Nome da Categoria (Ex: Coleção Jesus)">`;
             } 
+            else if(mode === 'sobre-block') {
+                document.getElementById('modal-title').innerText = "Adicionar Bloco (Sobre Nós)";
+                aspect = NaN; 
+                
+                dynamicFields.innerHTML = `
+                    <select id="sobre-type" class="input-modern" style="margin-bottom: 10px;" onchange="toggleSobreFields()">
+                        <option value="text">Texto</option>
+                        <option value="image">Imagem</option>
+                    </select>
+                    <div id="sobre-text-fields">
+                        <select id="sobre-style" class="input-modern" style="margin-bottom: 10px;">
+                            <option value="normal">Texto Normal</option>
+                            <option value="title">Título Elegante</option>
+                        </select>
+                        <select id="sobre-align" class="input-modern" style="margin-bottom: 10px;">
+                            <option value="left">Alinhar à Esquerda</option>
+                            <option value="center" selected>Centralizar</option>
+                            <option value="right">Alinhar à Direita</option>
+                        </select>
+                        <textarea id="sobre-content" class="input-modern" placeholder="Escreva o texto aqui..." style="min-height: 100px; resize: vertical; margin-bottom:10px;"></textarea>
+                    </div>
+                `;
+                setTimeout(() => toggleSobreFields(), 50);
+            }
             else if(mode === 'product' || mode === 'edit-product') {
                 document.getElementById('modal-title').innerText = mode === 'product' ? "Novo Produto" : "Editar Produto";
                 let options = localCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -1641,10 +1740,10 @@
         }
 
         function saveData() {
-            if(!cropper) { showMessage("A imagem principal é obrigatória."); return; }
             if(!db) { showMessage("Erro de conexão."); return; }
 
             let dataObj = {}; let path = '';
+            let needsImage = true;
 
             if(uploadMode === 'category' || uploadMode === 'edit-category') {
                 const name = document.getElementById('cat-name').value;
@@ -1687,8 +1786,35 @@
                     gallery: tempGallery 
                 }; 
             }
+            else if (uploadMode === 'sobre-block') {
+                const type = document.getElementById('sobre-type').value;
+                if (type === 'text') {
+                    needsImage = false;
+                    const content = document.getElementById('sobre-content').value;
+                    if(!content.trim()) { showMessage("Digite o texto."); return; }
+                    const align = document.getElementById('sobre-align').value;
+                    const style = document.getElementById('sobre-style').value;
+                    
+                    showLoading("A guardar...");
+                    db.ref('store/aboutBlocks').push({ type: 'text', content: content, align: align, style: style, timestamp: Date.now() })
+                      .then(() => finishSave()).catch(() => { hideLoading(); showMessage("Erro ao salvar."); });
+                    return; 
+                } else {
+                    path = 'store/aboutBlocks';
+                    dataObj = { type: 'image', timestamp: Date.now() };
+                }
+            }
 
-            const canvasWidth = uploadMode === 'hero' ? 1536 : 400; const canvasHeight = uploadMode === 'hero' ? 640 : 400;
+            if(needsImage && !cropper) { showMessage("A imagem principal é obrigatória."); return; }
+
+            let canvasWidth = 400; let canvasHeight = 400;
+            if (uploadMode === 'hero') { canvasWidth = 1536; canvasHeight = 640; }
+            else if (uploadMode === 'sobre-block') {
+                const cropData = cropper.getCropBoxData();
+                canvasWidth = 800;
+                canvasHeight = 800 * (cropData.height / cropData.width);
+            }
+
             const canvas = cropper.getCroppedCanvas({ width: canvasWidth, height: canvasHeight, fillColor: '#fff' });
             if (!canvas) { showMessage("Erro na imagem."); return; }
 
@@ -1708,7 +1834,6 @@
         function finishSave() { hideLoading(); closeModal('modal-form'); showMessage("Salvo com sucesso!"); }
 
         function checkSession() {
-            // Recupera a sacola salva na memória do navegador
             const savedCart = localStorage.getItem('savedCart');
             if (savedCart) {
                 try { userCart = JSON.parse(savedCart); } catch(e) {}
@@ -1721,7 +1846,6 @@
                 if (timePassed > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } 
                 else { activeUser = JSON.parse(storedUser); updateActivity(); enterApp(activeUser.role === 'admin'); }
             }
-            
             checkPostPaymentRedirect(); 
         }
 
