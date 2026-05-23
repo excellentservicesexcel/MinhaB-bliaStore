@@ -577,7 +577,7 @@
         <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
             <svg class="error-x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
                 <circle cx="26" cy="26" r="25" fill="none"/>
-                <path fill="none" d="M16 16 36 36 M36 16 16 36"/>
+                <path fill="none" d="M16 16 L36 36 M36 16 L16 36"/>
             </svg>
             <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Compra não concluída</h3>
             <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">Não foi possível validar o seu pagamento ou ele foi cancelado. Tente novamente mais tarde.</p>
@@ -1130,8 +1130,8 @@
                 notiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
                 notiBtn.style.display = 'flex';
 
-                // Descobre se foi aprovado ou se deu erro/cancelado
-                if (status === 'approved') {
+                // ACEITA OS STATUS EM QUE O DINHEIRO REALMENTE ESTÁ ENTRANDO/PROCESSANDO
+                if (status === 'approved' || status === 'pending' || status === 'in_process' || status === 'authorized') {
                     lastPaymentStatus = 'approved';
                     
                     if (purchasedItems.length > 0) {
@@ -1153,7 +1153,7 @@
                                 timestamp: Date.now(),
                                 phone: activeUser.phone || '',
                                 whatsapp: true,
-                                status: 'paid',
+                                status: status === 'approved' ? 'paid' : 'pending',
                                 visibleToAdmin: false // Fica oculto até ele confirmar número no final!
                             });
                         }
@@ -1163,18 +1163,17 @@
                         updateCartBadges();
                     }
                 } else {
-                    // status null (cancelou), rejected, in_process, etc.
                     lastPaymentStatus = 'rejected';
                 }
 
-                // Simula o tempo de verificação (4 segundos)
+                // Aumentado o tempo de verificação oculta para 15 segundos (simulando a demora do MP)
                 setTimeout(() => { 
                     document.getElementById('modal-validating').classList.remove('active');
                     
                     // Acende o botão de notificação
                     notiBtn.className = 'floating-noti active';
                     notiBtn.innerHTML = '<div class="noti-badge">1</div><i class="fa-solid fa-bell"></i> 1 Notificação';
-                }, 4000);
+                }, 15000); // 15 segundos!
             }
         }
 
