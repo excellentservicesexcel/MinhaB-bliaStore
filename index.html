@@ -274,10 +274,17 @@
             padding: 10px 20px; display: none; align-items: center; gap: 10px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.15); cursor: pointer; z-index: 100;
             font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
-            animation: slideInRight 0.5s forwards;
+            animation: slideInRight 0.5s forwards; transition: 0.3s;
         }
         @keyframes slideInRight { from { transform: translateX(100px); opacity: 0;} to { transform: translateX(0); opacity: 1;} }
-        .floating-noti i { color: #4caf50; font-size: 16px; }
+        
+        .floating-noti.pending { border-color: var(--border-color); color: var(--text-light); pointer-events: none; }
+        .floating-noti.pending i { color: var(--text-light); }
+        
+        .floating-noti.active { border-color: var(--accent); color: var(--primary); pointer-events: auto; }
+        .floating-noti.active i { color: var(--accent); font-size: 16px; }
+
+        .noti-badge { position: absolute; top: -5px; right: -5px; background: #d9534f; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold;}
 
         .success-checkmark {
             width: 80px; height: 80px; margin: 0 auto 20px auto;
@@ -289,6 +296,16 @@
         @keyframes stroke { 100% { stroke-dashoffset: 0; } }
         @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
         @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 30px rgba(76, 175, 80, 0.1); } }
+
+        /* Animação elegante do X Vermelho */
+        .error-x {
+            width: 80px; height: 80px; margin: 0 auto 20px auto;
+            border-radius: 50%; display: block; stroke-width: 4; stroke: #d9534f; stroke-miterlimit: 10;
+            box-shadow: inset 0px 0px 0px #d9534f; animation: fill-red .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+        }
+        .error-x circle { stroke-dasharray: 166; stroke-dashoffset: 166; stroke-width: 4; stroke-miterlimit: 10; stroke: #d9534f; fill: none; animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards; }
+        .error-x path { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke .3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards; }
+        @keyframes fill-red { 100% { box-shadow: inset 0px 0px 0px 30px rgba(217, 83, 79, 0.1); } }
     </style>
 </head>
 <body>
@@ -302,8 +319,9 @@
     <div class="floating-comandas" onclick="openAdminOrders()" title="Ver Comandas">
         <i class="fa-solid fa-receipt"></i>
     </div>
-    <div class="floating-noti" id="noti-btn" onclick="startPostPaymentFlow()">
-        <i class="fa-solid fa-circle-check"></i> 1 Nova Notificação
+    
+    <div class="floating-noti pending" id="noti-btn" onclick="startPostPaymentFlow()">
+        <i class="fa-solid fa-spinner fa-spin"></i> Verificando...
     </div>
 
     <main id="view-login" class="view active">
@@ -509,7 +527,7 @@
     <div class="modal-overlay" id="modal-validating">
         <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
             <div class="spinner" style="margin: 0 auto 20px auto; border-color: var(--border-color); border-top-color: var(--accent);"></div>
-            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento</h3>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">A analisar pagamento...</h3>
             <p style="font-size: 12px; color: var(--text-light); line-height: 1.5;">Se a sua compra for validada, notificaremos você por aqui em instantes.</p>
         </div>
     </div>
@@ -552,6 +570,18 @@
             <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Tudo Certo!</h3>
             <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">Em breve a loja entrará em contato para mais informações da compra.</p>
             <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="finishPostPay()">Concluir</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-post-pay-error">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <svg class="error-x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="25" fill="none"/>
+                <path fill="none" d="M16 16 36 36 M36 16 16 36"/>
+            </svg>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Compra não concluída</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">Não foi possível validar o seu pagamento ou ele foi cancelado. Tente novamente mais tarde.</p>
+            <button type="button" class="btn-gold" style="width: 100%; padding: 15px; background: #d9534f;" onclick="closeErrorFlow()">Fechar</button>
         </div>
     </div>
 
@@ -672,6 +702,9 @@
         // VARIÁVEIS DE PRODUTO INDIVIDUAL
         let selectedProductVariant = null; 
         let currentProductQuantity = 1;
+
+        // VARIÁVEL DE ESTADO DE PAGAMENTO
+        let lastPaymentStatus = null;
 
         // --- SISTEMA DE SESSÃO PERSISTENTE E INATIVIDADE ---
         const STORAGE_KEY = 'minha_biblia_user';
@@ -1030,7 +1063,7 @@
                 return;
             }
 
-            showLoading("A gerar pagamento...");
+            showLoading("Aguardando redirecionamento seguro...");
 
             const itemsForMP = selected.map(item => {
                 const price = item.hasVariants ? item.selectedVariantData.price : item.price;
@@ -1052,8 +1085,8 @@
                 items: itemsForMP,
                 back_urls: {
                     success: returnUrl,
-                    failure: window.location.href,
-                    pending: window.location.href
+                    failure: returnUrl,
+                    pending: returnUrl
                 },
                 auto_return: "approved"
             };
@@ -1067,65 +1100,98 @@
             })
             .then(res => res.json())
             .then(data => {
-                hideLoading();
                 if(data.init_point) { window.location.href = data.init_point; } 
-                else { showMessage("Erro ao gerar link do Mercado Pago."); }
+                else { hideLoading(); showMessage("Erro ao gerar link do Mercado Pago."); }
             })
             .catch(err => { hideLoading(); showMessage("Erro de conexão com Mercado Pago."); });
         }
 
+        // Verificação Silenciosa no Retorno
         function checkPostPaymentRedirect() {
             const urlParams = new URLSearchParams(window.location.search);
             const status = urlParams.get('collection_status');
             const fromMp = urlParams.get('from_mp');
 
-            if((status === 'approved' || fromMp === 'true') && activeUser) {
+            if(fromMp === 'true' || status != null) {
+                
+                // Limpa a URL na hora para não repetir
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                if(!activeUser) return; // Se por algum motivo deslogou, ignora
+
                 const purchasedItems = userCart.filter(item => item.selected);
                 
-                if (purchasedItems.length > 0) {
-                    const orderId = 'MB-' + Date.now().toString().slice(-6); 
-                    let totalVal = 0;
-                    purchasedItems.forEach(i => {
-                        const price = i.hasVariants ? i.selectedVariantData.price : i.price;
-                        totalVal += (parsePriceBR(price) * i.quantity);
-                    });
-                    const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                // Exibe modal bloqueando tela
+                document.getElementById('modal-validating').classList.add('active');
+                
+                // Exibe o botão de notificação em estado "pendente"
+                const notiBtn = document.getElementById('noti-btn');
+                notiBtn.className = 'floating-noti pending';
+                notiBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando...';
+                notiBtn.style.display = 'flex';
 
-                    if(db) {
-                        db.ref('orders/' + orderId).set({
-                            orderId: orderId,
-                            userId: activeUser.username,
-                            userName: activeUser.name,
-                            items: purchasedItems,
-                            total: totalFmt,
-                            timestamp: Date.now(),
-                            phone: activeUser.phone || '',
-                            whatsapp: true,
-                            status: 'paid',
-                            visibleToAdmin: false // Esconde da desenvolvedora até o fim do fluxo
+                // Descobre se foi aprovado ou se deu erro/cancelado
+                if (status === 'approved') {
+                    lastPaymentStatus = 'approved';
+                    
+                    if (purchasedItems.length > 0) {
+                        const orderId = 'MB-' + Date.now().toString().slice(-6); 
+                        let totalVal = 0;
+                        purchasedItems.forEach(i => {
+                            const price = i.hasVariants ? i.selectedVariantData.price : i.price;
+                            totalVal += (parsePriceBR(price) * i.quantity);
                         });
+                        const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                        if(db) {
+                            db.ref('orders/' + orderId).set({
+                                orderId: orderId,
+                                userId: activeUser.username,
+                                userName: activeUser.name,
+                                items: purchasedItems,
+                                total: totalFmt,
+                                timestamp: Date.now(),
+                                phone: activeUser.phone || '',
+                                whatsapp: true,
+                                status: 'paid',
+                                visibleToAdmin: false // Fica oculto até ele confirmar número no final!
+                            });
+                        }
+
+                        window.currentOrderId = orderId;
+                        userCart = userCart.filter(item => !item.selected);
+                        updateCartBadges();
                     }
-
-                    window.currentOrderId = orderId;
-
-                    userCart = userCart.filter(item => !item.selected);
-                    updateCartBadges();
-                    
-                    document.getElementById('modal-validating').classList.add('active');
-                    
-                    setTimeout(() => { 
-                        document.getElementById('modal-validating').classList.remove('active');
-                        document.getElementById('noti-btn').style.display = 'flex'; 
-                    }, 4000);
+                } else {
+                    // status null (cancelou), rejected, in_process, etc.
+                    lastPaymentStatus = 'rejected';
                 }
 
-                window.history.replaceState({}, document.title, window.location.pathname);
+                // Simula o tempo de verificação (4 segundos)
+                setTimeout(() => { 
+                    document.getElementById('modal-validating').classList.remove('active');
+                    
+                    // Acende o botão de notificação
+                    notiBtn.className = 'floating-noti active';
+                    notiBtn.innerHTML = '<div class="noti-badge">1</div><i class="fa-solid fa-bell"></i> 1 Notificação';
+                }, 4000);
             }
         }
 
+        // Quando clica no botão Flutuante de Notificação
         function startPostPaymentFlow() {
             document.getElementById('noti-btn').style.display = 'none';
-            document.getElementById('modal-post-pay-1').classList.add('active');
+            
+            if (lastPaymentStatus === 'approved') {
+                document.getElementById('modal-post-pay-1').classList.add('active');
+            } else {
+                document.getElementById('modal-post-pay-error').classList.add('active');
+            }
+        }
+
+        function closeErrorFlow() {
+            document.getElementById('modal-post-pay-error').classList.remove('active');
+            goHome();
         }
 
         function goToPostPay2() {
@@ -1142,7 +1208,7 @@
                 db.ref('orders/' + window.currentOrderId).update({
                     phone: phone,
                     whatsapp: isWpp,
-                    visibleToAdmin: true // Agora aparece na comanda!
+                    visibleToAdmin: true // AGORA SIM APARECE NA COMANDA DA ADMIN!
                 });
             }
 
@@ -1157,6 +1223,7 @@
                 db.ref('users/' + activeUser.username).update({ phone: activeUser.phone });
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
             }
+            goHome(); // Volta pra home e fecha tudo certinho
         }
 
         // --- SISTEMA DE COMANDAS DA DESENVOLVEDORA ---
@@ -1173,9 +1240,10 @@
                 const orders = snap.val();
                 if(!orders) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda encontrada.</p>'; return; }
                 
+                // Filtra as que NÃO estão com visibleToAdmin = false
                 const sorted = Object.values(orders).filter(o => o.visibleToAdmin !== false).sort((a,b) => b.timestamp - a.timestamp);
                 
-                if(sorted.length === 0) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda verificada.</p>'; return; }
+                if(sorted.length === 0) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda concluída ainda.</p>'; return; }
 
                 sorted.forEach(o => {
                     const date = new Date(o.timestamp).toLocaleString('pt-BR');
@@ -1575,6 +1643,7 @@
                 if (timePassed > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } 
                 else { activeUser = JSON.parse(storedUser); updateActivity(); enterApp(activeUser.role === 'admin'); }
             }
+            // Aciona a verificação da volta do Mercado Pago
             checkPostPaymentRedirect(); 
         }
 
