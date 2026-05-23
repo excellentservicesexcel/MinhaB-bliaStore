@@ -256,6 +256,39 @@
 
         .gallery-thumb-container { display: flex; gap: 8px; overflow-x: auto; margin-top: 10px; padding-bottom: 5px; scrollbar-width: thin; }
         .gallery-thumb { width: 50px; height: 50px; border-radius: 4px; border: 1px solid var(--border-color); object-fit: cover; position: relative; flex-shrink: 0;}
+
+        /* ADIÇÕES CIRÚRGICAS PARA COMANDAS E CHECKOUT VISITANTE */
+        .floating-comandas {
+            position: fixed; bottom: 80px; right: 20px; width: 50px; height: 50px; 
+            background: var(--primary); color: white; border-radius: 50%;
+            display: none; justify-content: center; align-items: center; font-size: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); cursor: pointer; z-index: 100;
+            transition: 0.3s;
+        }
+        .floating-comandas:hover { transform: scale(1.1); }
+        .is-dev .floating-comandas { display: flex; }
+
+        .floating-noti {
+            position: fixed; top: 80px; right: 20px; background: var(--surface);
+            border: 2px solid var(--accent); color: var(--primary); border-radius: 30px;
+            padding: 10px 20px; display: none; align-items: center; gap: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15); cursor: pointer; z-index: 100;
+            font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+            animation: slideInRight 0.5s forwards;
+        }
+        @keyframes slideInRight { from { transform: translateX(100px); opacity: 0;} to { transform: translateX(0); opacity: 1;} }
+        .floating-noti i { color: #4caf50; font-size: 16px; }
+
+        .success-checkmark {
+            width: 80px; height: 80px; margin: 0 auto 20px auto;
+            border-radius: 50%; display: block; stroke-width: 4; stroke: #4caf50; stroke-miterlimit: 10;
+            box-shadow: inset 0px 0px 0px #4caf50; animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+        }
+        .success-checkmark circle { stroke-dasharray: 166; stroke-dashoffset: 166; stroke-width: 4; stroke-miterlimit: 10; stroke: #4caf50; fill: none; animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards; }
+        .success-checkmark path { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke .3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards; }
+        @keyframes stroke { 100% { stroke-dashoffset: 0; } }
+        @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+        @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 30px rgba(76, 175, 80, 0.1); } }
     </style>
 </head>
 <body>
@@ -264,6 +297,13 @@
     <div class="loading-screen" id="loading-screen">
         <div class="spinner"></div>
         <p id="loading-text" style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: bold;">Carregando...</p>
+    </div>
+
+    <div class="floating-comandas" onclick="openAdminOrders()" title="Ver Comandas">
+        <i class="fa-solid fa-receipt"></i>
+    </div>
+    <div class="floating-noti" id="noti-btn" onclick="startPostPaymentFlow()">
+        <i class="fa-solid fa-circle-check"></i> 1 Nova Notificação
     </div>
 
     <main id="view-login" class="view active">
@@ -440,6 +480,83 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="modal-auth-checkout">
+        <div class="modal-content" style="max-width: 400px; padding: 30px; text-align: center; position: relative;">
+            <button type="button" class="btn-close" onclick="closeModal('modal-auth-checkout')" style="position: absolute; top: 15px; right: 15px;"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div class="logo-icon" style="margin-bottom: 10px;"><i class="fa-solid fa-book-bible" style="font-size:24px;"></i></div>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Identifique-se</h3>
+            <p style="font-size: 11px; color: var(--text-light); margin-bottom: 25px;">Para finalizar sua compra, faça login ou crie sua conta de forma rápida!</p>
+            
+            <div id="auth-check-login-form">
+                <div class="input-group"><input type="text" id="chk-login-user" class="input-modern" placeholder="Seu Usuário"></div>
+                <div class="input-group"><input type="password" id="chk-login-pass" class="input-modern" placeholder="Senha"></div>
+                <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="processCheckoutAuth('login')">Entrar e Continuar</button>
+                <button type="button" class="btn-guest" onclick="toggleAuthCheck('register')">Criar Nova Conta</button>
+            </div>
+            
+            <div id="auth-check-reg-form" style="display: none;">
+                <div class="input-group"><input type="text" id="chk-reg-user" class="input-modern" placeholder="Novo Usuário (Ex: nome.sobrenome)"></div>
+                <div class="input-group"><input type="password" id="chk-reg-pass" class="input-modern" placeholder="Senha Forte"></div>
+                <div class="input-group"><input type="text" id="chk-reg-phone" class="input-modern" placeholder="WhatsApp / Contato"></div>
+                <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="processCheckoutAuth('register')">Criar Conta e Continuar</button>
+                <button type="button" class="btn-guest" onclick="toggleAuthCheck('login')">Já tenho conta</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-post-pay-1">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="25" fill="none"/>
+                <path fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Compra Concluída!</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">O seu pagamento foi validado com sucesso. A nossa loja entrará em contato com você em breve.</p>
+            <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="goToPostPay2()">Concluir</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-post-pay-2">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <h3 class="serif" style="margin-bottom: 15px; color: var(--primary);">Confirme seu Contato</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 20px;">Por onde prefere que a gente fale com você?</p>
+            
+            <div class="input-group"><input type="text" id="post-pay-phone" class="input-modern" placeholder="Número de Telefone"></div>
+            
+            <div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 25px;">
+                <label style="font-size: 12px; color: var(--primary); font-weight: 600; cursor: pointer;">
+                    <input type="radio" name="wpp-radio" id="post-pay-wpp-sim" checked> É WhatsApp
+                </label>
+                <label style="font-size: 12px; color: var(--primary); font-weight: 600; cursor: pointer;">
+                    <input type="radio" name="wpp-radio" id="post-pay-wpp-nao"> Apenas Ligação/SMS
+                </label>
+            </div>
+
+            <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="goToPostPay3()">Concluir</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-post-pay-3">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <i class="fa-solid fa-heart" style="font-size: 40px; color: var(--accent); margin-bottom: 20px;"></i>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Tudo Certo!</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">Em breve a loja entrará em contato para mais informações da compra.</p>
+            <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="finishPostPay()">Concluir</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-admin-orders">
+        <div class="modal-content" style="max-width: 500px; padding: 20px;">
+            <div class="modal-header">
+                <h3 class="serif"><i class="fa-solid fa-receipt"></i> Comandas</h3>
+                <button type="button" class="btn-close" onclick="closeModal('modal-admin-orders')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="user-list-admin" id="admin-orders-list" style="max-height: 70vh;"></div>
+        </div>
+    </div>
+
 
     <div class="modal-overlay" id="modal-form">
         <div class="modal-content">
@@ -720,7 +837,6 @@
             const tagEl = document.getElementById('detail-tag');
             if(p.tag) { tagEl.innerText = p.tag; tagEl.style.display = 'block'; } else { tagEl.style.display = 'none'; }
             
-            // GALERIA DE FOTOS
             const galContainer = document.getElementById('detail-gallery');
             if (p.gallery && p.gallery.length > 0) {
                 let galHtml = `<img src="${p.imageUrl}" onclick="document.getElementById('detail-img').src=this.src" class="gallery-thumb" style="cursor: pointer;">`;
@@ -728,7 +844,6 @@
                 galContainer.innerHTML = galHtml; galContainer.style.display = 'flex';
             } else { galContainer.style.display = 'none'; galContainer.innerHTML = ''; }
             
-            // VARIANTES DE TAMANHO
             const varContainer = document.getElementById('detail-variants');
             const priceEl = document.getElementById('detail-price');
             
@@ -746,7 +861,7 @@
                 varContainer.style.display = 'none';
                 priceEl.innerText = p.price;
                 priceEl.style.fontSize = '18px'; priceEl.style.color = 'var(--accent)';
-                selectedProductVariant = -1; // -1 significa que não tem variação, pode seguir direto
+                selectedProductVariant = -1;
             }
 
             document.getElementById('btn-add-to-cart').onclick = function() { addToCart(p); };
@@ -777,7 +892,6 @@
             let vData = null;
             if(selectedProductVariant !== -1) { vData = product.variants[selectedProductVariant]; }
 
-            // Verifica se este produto COM ESTE TAMANHO já está na sacola
             const exists = userCart.find(item => item.id === product.id && 
                 (item.hasVariants ? item.selectedVariantData.name === vData.name : true)
             );
@@ -790,7 +904,7 @@
                     ...product, 
                     selected: true,
                     quantity: currentProductQuantity,
-                    selectedVariantData: vData // null se não tiver variante
+                    selectedVariantData: vData 
                 });
                 showMessage("Adicionado à sacola!");
             }
@@ -799,7 +913,7 @@
         }
 
         function updateCartBadges() {
-            const count = userCart.reduce((sum, item) => sum + item.quantity, 0); // Soma as quantidades
+            const count = userCart.reduce((sum, item) => sum + item.quantity, 0); 
             const b1 = document.getElementById('cart-badge');
             if(count > 0) { if(b1) { b1.style.display = 'flex'; b1.innerText = count; } } 
             else { if(b1) b1.style.display = 'none'; }
@@ -851,17 +965,69 @@
             document.getElementById('cart-total-display').innerText = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
-        // --- INTEGRAÇÃO MERCADO PAGO ---
+        // --- SISTEMA DE AUTENTICAÇÃO NO CHECKOUT VISITANTE ---
+        function toggleAuthCheck(view) {
+            document.getElementById('auth-check-login-form').style.display = view === 'login' ? 'block' : 'none';
+            document.getElementById('auth-check-reg-form').style.display = view === 'register' ? 'block' : 'none';
+        }
+
+        function processCheckoutAuth(type) {
+            showLoading(type === 'login' ? "Acessando..." : "Criando Conta...");
+            if (type === 'login') {
+                const u = document.getElementById('chk-login-user').value.toLowerCase().trim();
+                const p = document.getElementById('chk-login-pass').value.trim();
+                if(!db) { hideLoading(); showMessage("Offline"); return; }
+                
+                db.ref('users/' + u).once('value').then(snap => {
+                    const userData = snap.val();
+                    hideLoading();
+                    if(userData && userData.password === p) {
+                        activeUser = userData; activeUser.username = u;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                        enterApp(userData.role === 'admin');
+                        closeModal('modal-auth-checkout');
+                        processCheckout();
+                    } else { showMessage("Usuário ou senha incorretos."); }
+                }).catch(() => { hideLoading(); showMessage("Erro de conexão."); });
+            } else {
+                const u = document.getElementById('chk-reg-user').value.toLowerCase().trim();
+                const p = document.getElementById('chk-reg-pass').value.trim();
+                const ph = document.getElementById('chk-reg-phone').value.trim();
+                if(u.length < 3 || !p) { hideLoading(); showMessage("Dados inválidos."); return; }
+                
+                db.ref('users/' + u).once('value').then(snap => {
+                    if(snap.exists()) { hideLoading(); showMessage("Este usuário já existe."); }
+                    else {
+                        const newUser = { username: u, password: p, phone: ph, role: 'user', name: 'Novo Cliente', profilePic: '' };
+                        db.ref('users/' + u).set(newUser).then(() => {
+                            hideLoading();
+                            activeUser = newUser;
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                            enterApp(false);
+                            closeModal('modal-auth-checkout');
+                            processCheckout(); // Continua o fluxo automaticamente
+                        });
+                    }
+                });
+            }
+        }
+
+        // --- INTEGRAÇÃO MERCADO PAGO E PÓS-PAGAMENTO ---
         function processCheckout() {
             const selected = userCart.filter(item => item.selected);
             if(selected.length === 0) { showMessage("Selecione pelo menos um item da sacola."); return; }
+
+            // Se for visitante, impede a compra e mostra modal
+            if(!activeUser) {
+                document.getElementById('modal-auth-checkout').classList.add('active');
+                return;
+            }
 
             showLoading("Gerando pagamento...");
 
             const itemsForMP = selected.map(item => {
                 const price = item.hasVariants ? item.selectedVariantData.price : item.price;
-                const variantSuffix = item.hasVariants ? ` (${item.selectedVariantData.name})` : '';
-                
+                const variantSuffix = item.hasVariants ? ` (Tam: ${item.selectedVariantData.name})` : '';
                 return {
                     title: `MINHA BÍBLIA STORE - ${item.title}${variantSuffix}`,
                     description: "Compra Minha Bíblia Store",
@@ -873,10 +1039,13 @@
                 };
             });
 
+            // Adiciona a flag ?from_mp=true para validar a volta
+            const returnUrl = window.location.origin + window.location.pathname + "?from_mp=true";
+
             const mpData = {
                 items: itemsForMP,
                 back_urls: {
-                    success: window.location.href,
+                    success: returnUrl,
                     failure: window.location.href,
                     pending: window.location.href
                 },
@@ -887,26 +1056,157 @@
 
             fetch('https://api.mercadopago.com/checkout/preferences', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(mpData)
             })
             .then(res => res.json())
             .then(data => {
                 hideLoading();
-                if(data.init_point) {
-                    window.location.href = data.init_point; 
-                } else {
-                    console.error("Erro MP:", data);
-                    showMessage("Erro ao gerar link do Mercado Pago.");
-                }
+                if(data.init_point) { window.location.href = data.init_point; } 
+                else { showMessage("Erro ao gerar link do Mercado Pago."); }
             })
-            .catch(err => {
-                hideLoading();
-                console.error("Erro requisição:", err);
-                showMessage("Erro de conexão com Mercado Pago.");
+            .catch(err => { hideLoading(); showMessage("Erro de conexão com Mercado Pago."); });
+        }
+
+        // Função de Validação do Retorno
+        function checkPostPaymentRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const status = urlParams.get('collection_status');
+            const fromMp = urlParams.get('from_mp');
+
+            if((status === 'approved' || fromMp === 'true') && activeUser) {
+                const purchasedItems = userCart.filter(item => item.selected);
+                
+                if (purchasedItems.length > 0) {
+                    const orderId = 'MB-' + Date.now().toString().slice(-6); // Gerador de ID Curto
+                    let totalVal = 0;
+                    purchasedItems.forEach(i => {
+                        const price = i.hasVariants ? i.selectedVariantData.price : i.price;
+                        totalVal += (parsePriceBR(price) * i.quantity);
+                    });
+                    const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                    if(db) {
+                        db.ref('orders/' + orderId).set({
+                            orderId: orderId,
+                            userId: activeUser.username,
+                            userName: activeUser.name,
+                            items: purchasedItems,
+                            total: totalFmt,
+                            timestamp: Date.now(),
+                            phone: activeUser.phone || '',
+                            whatsapp: true,
+                            status: 'paid'
+                        });
+                    }
+
+                    window.currentOrderId = orderId;
+
+                    // Limpa a sacola (apenas o que foi comprado)
+                    userCart = userCart.filter(item => !item.selected);
+                    updateCartBadges();
+                    
+                    // Notificação Flutuante
+                    setTimeout(() => { showMessage("Se sua compra for validada notificaremos"); }, 1000);
+                    setTimeout(() => { document.getElementById('noti-btn').style.display = 'flex'; }, 4000);
+                }
+
+                // Limpa a URL para não refazer o processo se a página atualizar
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        function startPostPaymentFlow() {
+            document.getElementById('noti-btn').style.display = 'none';
+            document.getElementById('modal-post-pay-1').classList.add('active');
+        }
+
+        function goToPostPay2() {
+            document.getElementById('modal-post-pay-1').classList.remove('active');
+            document.getElementById('post-pay-phone').value = activeUser.phone || '';
+            document.getElementById('modal-post-pay-2').classList.add('active');
+        }
+
+        function goToPostPay3() {
+            const phone = document.getElementById('post-pay-phone').value.trim();
+            const isWpp = document.getElementById('post-pay-wpp-sim').checked;
+
+            if(window.currentOrderId && db) {
+                db.ref('orders/' + window.currentOrderId).update({
+                    phone: phone,
+                    whatsapp: isWpp
+                });
+            }
+
+            document.getElementById('modal-post-pay-2').classList.remove('active');
+            document.getElementById('modal-post-pay-3').classList.add('active');
+        }
+
+        function finishPostPay() {
+            document.getElementById('modal-post-pay-3').classList.remove('active');
+            if(activeUser.phone !== document.getElementById('post-pay-phone').value.trim() && db) {
+                activeUser.phone = document.getElementById('post-pay-phone').value.trim();
+                db.ref('users/' + activeUser.username).update({ phone: activeUser.phone });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+            }
+        }
+
+        // --- SISTEMA DE COMANDAS DA DESENVOLVEDORA ---
+        function openAdminOrders() {
+            if(!isDeveloper) return;
+            document.getElementById('modal-admin-orders').classList.add('active');
+            const list = document.getElementById('admin-orders-list');
+            list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Carregando comandas...</p>';
+
+            if(!db) return;
+
+            db.ref('orders').orderByChild('timestamp').once('value').then(snap => {
+                list.innerHTML = '';
+                const orders = snap.val();
+                if(!orders) { list.innerHTML = '<p style="text-align:center; font-size:12px; color:var(--text-light);">Nenhuma comanda encontrada.</p>'; return; }
+                
+                const sorted = Object.values(orders).sort((a,b) => b.timestamp - a.timestamp);
+                
+                sorted.forEach(o => {
+                    const date = new Date(o.timestamp).toLocaleString('pt-BR');
+                    let itemsHtml = '';
+                    if(o.items) {
+                        o.items.forEach(i => {
+                            const varTxt = i.hasVariants ? ` (Tam: ${i.selectedVariantData.name})` : '';
+                            itemsHtml += `<div style="font-size:11px; color:var(--text-light); margin-bottom: 4px;">&bull; ${i.quantity}x ${i.title}${varTxt}</div>`;
+                        });
+                    }
+                    
+                    let contactHtml = '';
+                    const cleanPhone = o.phone ? o.phone.replace(/\D/g, '') : '';
+                    if(o.phone) {
+                        if(o.whatsapp) {
+                            contactHtml = `<a href="https://wa.me/55${cleanPhone}" target="_blank" class="btn-gold" style="padding:10px; font-size:10px; text-decoration:none; display:block; text-align:center; border-radius:4px;"><i class="fa-brands fa-whatsapp" style="font-size:14px; margin-right:5px;"></i> Chamar no WhatsApp</a>`;
+                        } else {
+                            contactHtml = `
+                                <div style="display:flex; gap:10px;">
+                                    <a href="tel:${cleanPhone}" class="btn-outline" style="padding:10px; font-size:10px; text-decoration:none; border-radius:4px; flex:1; text-align:center;"><i class="fa-solid fa-phone" style="margin-right:5px;"></i> Ligar</a>
+                                    <a href="sms:${cleanPhone}" class="btn-outline" style="padding:10px; font-size:10px; text-decoration:none; border-radius:4px; flex:1; text-align:center;"><i class="fa-solid fa-message" style="margin-right:5px;"></i> SMS</a>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        contactHtml = `<p style="font-size:10px; color: #d9534f; text-align:center;">Cliente sem número</p>`;
+                    }
+
+                    list.insertAdjacentHTML('beforeend', `
+                        <div style="border:1px solid var(--border-color); border-radius:8px; padding:15px; margin-bottom:15px; background:var(--bg-site);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:12px; font-weight:bold; color:var(--primary); background:rgba(172, 136, 84, 0.1); padding:4px 8px; border-radius:4px;">#${o.orderId}</span>
+                                <span style="font-size:10px; color:var(--text-light);">${date}</span>
+                            </div>
+                            <div style="font-size:13px; font-weight:600; margin-bottom:10px; color: var(--primary);">Cliente: ${o.userName}</div>
+                            <div style="margin-bottom:15px; background: var(--surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">${itemsHtml}</div>
+                            <div style="font-size:16px; font-weight:bold; color:var(--accent); margin-bottom:15px; text-align:center;">Total: ${o.total}</div>
+                            ${contactHtml}
+                        </div>
+                    `);
+                });
             });
         }
 
@@ -1008,7 +1308,6 @@
             let toShow = localProducts; if(currentFilter) toShow = localProducts.filter(p => p.categoryId === currentFilter);
             toShow.forEach(p => {
                 let tagHtml = p.tag ? `<div class="card-tag">${p.tag}</div>` : ''; let adminHtml = getAdminActionsHtml(p.id);
-                // Exibe "A partir de" se tiver variações
                 let dispPrice = p.hasVariants ? `A partir de ${p.variants[0].price}` : p.price;
                 html += `<div class="card" onclick="openProductDetails('${p.id}')"><div class="card-img" style="background-image: url('${p.imageUrl}')">${adminHtml}${tagHtml}</div><div class="card-title">${p.title}</div><div class="card-price">${dispPrice}</div></div>`;
             });
@@ -1043,19 +1342,13 @@
                 document.getElementById('prod-title').value = p.title;
                 document.getElementById('prod-tag').value = p.tag || '';
                 
-                // Trata as variações
                 const cbVariants = document.getElementById('chk-variants');
                 const pnlVariants = document.getElementById('panel-variants');
                 const inpSinglePrice = document.getElementById('prod-price');
 
                 if(p.hasVariants) {
-                    cbVariants.checked = true;
-                    pnlVariants.style.display = 'block';
-                    inpSinglePrice.style.display = 'none';
-                    inpSinglePrice.value = '';
-                    
-                    const varList = document.getElementById('variants-list');
-                    varList.innerHTML = '';
+                    cbVariants.checked = true; pnlVariants.style.display = 'block'; inpSinglePrice.style.display = 'none'; inpSinglePrice.value = '';
+                    const varList = document.getElementById('variants-list'); varList.innerHTML = '';
                     if(p.variants) {
                         p.variants.forEach(v => {
                             varList.insertAdjacentHTML('beforeend', `
@@ -1068,14 +1361,10 @@
                         });
                     }
                 } else {
-                    cbVariants.checked = false;
-                    pnlVariants.style.display = 'none';
-                    inpSinglePrice.style.display = 'block';
-                    inpSinglePrice.value = p.price || '';
+                    cbVariants.checked = false; pnlVariants.style.display = 'none'; inpSinglePrice.style.display = 'block'; inpSinglePrice.value = p.price || '';
                 }
                 
                 tempGallery = p.gallery ? [...p.gallery] : []; renderGalleryThumbnails();
-
                 const placeholder = document.getElementById('upload-placeholder'); const cropperWrapper = document.getElementById('cropper-wrapper'); const btnChangePhoto = document.getElementById('btn-change-photo'); const imagePreview = document.getElementById('image-preview');
                 placeholder.style.display = 'none'; cropperWrapper.style.display = 'block'; btnChangePhoto.style.display = 'block';
                 if(cropper) { cropper.destroy(); cropper = null; }
@@ -1120,7 +1409,6 @@
         };
         window.removeGalleryImg = function(index) { tempGallery.splice(index, 1); renderGalleryThumbnails(); };
 
-        // SISTEMA DE ADMIN PARA ADICIONAR LINHAS DE VARIANTES
         window.toggleVariantPanel = function() {
             const isChecked = document.getElementById('chk-variants').checked;
             document.getElementById('panel-variants').style.display = isChecked ? 'block' : 'none';
@@ -1232,7 +1520,7 @@
                         if(n && p) variantsArr.push({ name: n, price: p });
                     });
                     if(variantsArr.length === 0) { showMessage("Adicione os detalhes de tamanho e preço!"); return; }
-                    finalPrice = ''; // Quando tem variação o preço é salvo apenas no array variants
+                    finalPrice = ''; 
                 } else {
                     if(!finalPrice) { showMessage("Preencha o valor do produto!"); return; }
                 }
@@ -1277,6 +1565,7 @@
                 if (timePassed > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } 
                 else { activeUser = JSON.parse(storedUser); updateActivity(); enterApp(activeUser.role === 'admin'); }
             }
+            checkPostPaymentRedirect(); // Aciona a verificação da volta do Mercado Pago
         }
 
         setInterval(() => { if (activeUser) { const lastActivity = localStorage.getItem(ACTIVITY_KEY); if (lastActivity && Date.now() - parseInt(lastActivity) > TIMEOUT_MS) { logout(); showMessage("Sessão expirada por inatividade."); } } }, 60000); 
