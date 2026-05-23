@@ -54,6 +54,9 @@
         .btn-gold { background: var(--accent); color: white; border: none; padding: 12px 24px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; }
         .btn-gold:hover { background: #957344; }
 
+        .user-avatar-header { width: 32px; height: 32px; border-radius: 50%; background-color: var(--surface); border: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; background-size: cover; background-position: center; color: var(--primary); font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .user-badge-header:hover .user-avatar-header { border-color: var(--accent); color: var(--accent); }
+
         @media (min-width: 1024px) { .nav-links { display: flex; } }
 
         /* --- LOGIN WRAPPER --- */
@@ -181,7 +184,7 @@
         .custom-check:checked { background: var(--accent); border-color: var(--accent); }
         .custom-check:checked::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: white; font-size: 12px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        /* Rodapé Flutuante do Carrinho: Comprar Esquerda, Total Direita */
+        /* Rodapé Flutuante do Carrinho */
         .cart-floating-footer { position: fixed; bottom: 0; left: 0; width: 100%; padding: 20px 5%; pointer-events: none; z-index: 90; display: flex; justify-content: space-between; align-items: flex-end; background: linear-gradient(to top, rgba(248, 245, 240, 1) 70%, rgba(248, 245, 240, 0)); }
         
         .floating-total-box { background: var(--surface); border: 2px solid var(--accent); padding: 10px 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: flex-end; pointer-events: auto; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
@@ -350,7 +353,7 @@
                 <div class="hero-subtitle">♥ Palavras que inspiram</div>
                 <h1 class="serif">Pulseiras que carregam fé, propósito e amor.</h1>
                 <p>Cada palavra uma lembrança diária da presença de Deus.</p>
-                <button type="button" class="btn-gold" style="padding: 15px 30px; width: auto;">Conheça a Coleção</button>
+                <button type="button" class="btn-gold" style="padding: 15px 30px; width: auto;" onclick="scrollToCategories()">Conheça a Coleção</button>
             </div>
             <div class="hero-img-wrapper">
                 <div class="hero-img" id="hero-img">
@@ -367,7 +370,7 @@
             </div>
         </section>
 
-        <section class="categories-container">
+        <section class="categories-container" id="categorias-section">
             <div class="section-header"><hr><span>♥</span><hr></div>
             <h2 class="section-title">Compre por Categoria</h2>
             <div class="section-header" style="margin-top: 10px; margin-bottom: 40px;"><hr><span>♥</span><hr></div>
@@ -552,7 +555,25 @@
         let localProducts = [];   
         let tempRegData = {}; 
         let userCart = []; 
-        let tempGallery = []; // ARMAZENA AS FOTOS ADICIONAIS DO PRODUTO
+        let tempGallery = []; 
+
+        // --- SISTEMA DE SESSÃO PERSISTENTE E INATIVIDADE ---
+        const STORAGE_KEY = 'minha_biblia_user';
+        const ACTIVITY_KEY = 'minha_biblia_last_act';
+        const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos em milissegundos
+
+        function updateActivity() {
+            if (activeUser) {
+                localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
+            }
+        }
+
+        // Monitora qualquer interação para zerar o cronômetro de inatividade
+        window.addEventListener('mousemove', updateActivity);
+        window.addEventListener('keypress', updateActivity);
+        window.addEventListener('click', updateActivity);
+        window.addEventListener('scroll', updateActivity);
+        window.addEventListener('touchstart', updateActivity);
 
         // CARROSSEL HERO VARIÁVEIS
         let heroImages = [];
@@ -572,6 +593,16 @@
             if(modalId === 'modal-form' || !modalId) currentEditId = null;
         }
 
+        // --- FUNÇÃO CIRÚRGICA DE ROLAGEM ---
+        function scrollToCategories() {
+            const catSection = document.getElementById('categorias-section');
+            if (catSection) {
+                // Pega a posição exata e desconta um pouco para o cabeçalho não cobrir o título
+                const y = catSection.getBoundingClientRect().top + window.scrollY - 80;
+                window.scrollTo({top: y, behavior: 'smooth'});
+            }
+        }
+
         // --- SISTEMA DE CONTAS / AUTENTICAÇÃO ---
         function processLogin(e) {
             if(e) e.preventDefault();
@@ -584,6 +615,8 @@
                 
                 if(u === 'andressa' && p === '1709') { 
                     activeUser = { username: 'andressa', name: 'Andressa', role: 'admin', phone: '', profilePic: '' };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                    updateActivity();
                     enterApp(true); 
                     return;
                 }
@@ -595,6 +628,8 @@
                     if(userData && userData.password === p) {
                         activeUser = userData;
                         activeUser.username = u;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                        updateActivity();
                         enterApp(userData.role === 'admin');
                     } else {
                         hideLoading(); showMessage("Usuário ou senha incorretos.");
@@ -605,6 +640,7 @@
 
         function processGuest() { 
             activeUser = null;
+            localStorage.removeItem(STORAGE_KEY);
             showLoading("Acessando Loja..."); 
             setTimeout(() => enterApp(false), 500); 
         }
@@ -615,6 +651,10 @@
             isDeveloper = false;
             userCart = [];
             updateCartBadges();
+            
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(ACTIVITY_KEY);
+
             document.getElementById('login-user').value = '';
             document.getElementById('login-pass').value = '';
             switchView('view-login');
@@ -680,6 +720,9 @@
             showLoading("Finalizando...");
             db.ref('users/' + tempRegData.username).set(tempRegData).then(() => {
                 activeUser = tempRegData;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                updateActivity();
+                
                 enterApp(false);
                 showMessage("Conta criada com sucesso!");
             }).catch(() => { hideLoading(); showMessage("Erro ao criar conta."); });
@@ -691,9 +734,12 @@
             if(isDeveloper) document.body.classList.add('is-dev');
             else document.body.classList.remove('is-dev');
             
+            const userBadge = document.getElementById('user-badge');
+            const avatarDiv = document.getElementById('header-avatar');
+            
+            userBadge.style.display = 'flex'; 
+
             if(activeUser) {
-                document.getElementById('user-badge').style.display = 'flex';
-                const avatarDiv = document.getElementById('header-avatar');
                 if(activeUser.profilePic) {
                     avatarDiv.style.backgroundImage = `url('${activeUser.profilePic}')`;
                     avatarDiv.innerHTML = '';
@@ -701,8 +747,13 @@
                     avatarDiv.style.backgroundImage = 'none';
                     avatarDiv.innerHTML = '<i class="fa-solid fa-user"></i>';
                 }
+                userBadge.onclick = openUserProfileModal;
+                userBadge.title = "Meu Perfil";
             } else {
-                document.getElementById('user-badge').style.display = 'none';
+                avatarDiv.style.backgroundImage = 'none';
+                avatarDiv.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i>';
+                userBadge.onclick = logout; 
+                userBadge.title = "Fazer Login / Criar Conta";
             }
 
             switchView('view-shop');
@@ -828,9 +879,7 @@
             // GALERIA DE FOTOS NO POP-UP
             const galContainer = document.getElementById('detail-gallery');
             if (p.gallery && p.gallery.length > 0) {
-                // Coloca a foto principal como a primeira opção
                 let galHtml = `<img src="${p.imageUrl}" onclick="document.getElementById('detail-img').src=this.src" class="gallery-thumb" style="cursor: pointer;">`;
-                // Adiciona as fotos adicionais
                 p.gallery.forEach(imgUrl => {
                     galHtml += `<img src="${imgUrl}" onclick="document.getElementById('detail-img').src=this.src" class="gallery-thumb" style="cursor: pointer;">`;
                 });
@@ -985,6 +1034,10 @@
                 if(activeUser.username === 'andressa' && !db) {
                     activeUser.name = n; activeUser.phone = ph;
                     if(updateData.profilePic) activeUser.profilePic = updateData.profilePic;
+                    
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                    updateActivity();
+
                     enterApp(true); closeModal('modal-user-profile'); showMessage("Perfil atualizado (Offline)");
                     return;
                 }
@@ -993,6 +1046,9 @@
                     activeUser.name = n; activeUser.phone = ph;
                     if(pass) activeUser.password = pass;
                     if(updateData.profilePic) activeUser.profilePic = updateData.profilePic;
+                    
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(activeUser));
+                    updateActivity();
                     
                     enterApp(isDeveloper); 
                     closeModal('modal-user-profile');
@@ -1077,7 +1133,6 @@
             `;
             localCategories.forEach(cat => {
                 const activeClass = currentFilter === cat.id ? 'active' : '';
-                // EDIÇÃO DE CATEGORIA ADICIONADA AQUI (ÍCONE LÁPIS)
                 let adminHtml = isDeveloper ? `<button class="btn-admin edit" style="position:absolute; top:-5px; right:-5px; width:22px; height:22px; font-size:10px; z-index:10; box-shadow:0 2px 5px rgba(0,0,0,0.2);" onclick="event.stopPropagation(); editCategory('${cat.id}')"><i class="fa-solid fa-pen"></i></button>` : '';
                 
                 html += `
@@ -1343,7 +1398,6 @@
                 document.getElementById('modal-title').innerText = mode === 'product' ? "Novo Produto" : "Editar Produto";
                 let options = localCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
                 
-                // HTML DA GALERIA INJETADO DENTRO DO MODAL DE PRODUTO
                 let galHtml = `
                     <div style="margin-top:15px; border-top: 1px solid var(--border-color); padding-top:15px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1403,7 +1457,7 @@
                 if(!cat || !title || !price) { showMessage("Preencha todos os campos obrigatórios."); return; }
                 
                 path = uploadMode === 'edit-product' ? 'products/' + currentEditId : 'products'; 
-                dataObj = { categoryId: cat, title: title, price: price, tag: tag, gallery: tempGallery }; // Salva a galeria junto
+                dataObj = { categoryId: cat, title: title, price: price, tag: tag, gallery: tempGallery }; 
             }
 
             const canvasWidth = uploadMode === 'hero' ? 1536 : 400;
@@ -1430,6 +1484,41 @@
         }
 
         function finishSave() { hideLoading(); closeModal('modal-form'); showMessage("Salvo com sucesso!"); }
+
+        // --- VERIFICAÇÃO INICIAL DA SESSÃO ---
+        function checkSession() {
+            const storedUser = localStorage.getItem(STORAGE_KEY);
+            const lastActivity = localStorage.getItem(ACTIVITY_KEY);
+            
+            if (storedUser && lastActivity) {
+                const timePassed = Date.now() - parseInt(lastActivity);
+                if (timePassed > TIMEOUT_MS) {
+                    // Se passou de 10 minutos, expira a sessão
+                    logout();
+                    showMessage("Sessão expirada por inatividade.");
+                } else {
+                    // Restaura a sessão ignorando a tela de login
+                    activeUser = JSON.parse(storedUser);
+                    updateActivity(); // Atualiza o tempo para não deslogar logo em seguida
+                    enterApp(activeUser.role === 'admin');
+                }
+            }
+        }
+
+        // Fica rodando no fundo pra deslogar o usuário caso deixe a aba aberta e passe dos 10 min
+        setInterval(() => {
+            if (activeUser) {
+                const lastActivity = localStorage.getItem(ACTIVITY_KEY);
+                if (lastActivity && Date.now() - parseInt(lastActivity) > TIMEOUT_MS) {
+                    logout();
+                    showMessage("Sessão expirada por inatividade.");
+                }
+            }
+        }, 60000); // Checa a cada 1 minuto
+
+        // Assim que a página carrega, ele chama a função que verifica a sessão
+        window.onload = checkSession;
+
     </script>
 </body>
 </html>
