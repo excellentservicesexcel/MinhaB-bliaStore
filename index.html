@@ -1154,6 +1154,72 @@
         @keyframes fill-red { 
             100% { box-shadow: inset 0px 0px 0px 30px rgba(217, 83, 79, 0.1); } 
         }
+        
+        .hero-img { 
+            overflow: hidden; 
+            background-image: none !important; 
+        }
+        
+        .carousel-track-hero { 
+            display: flex; 
+            width: 100%; 
+            height: 100%; 
+            transition: transform 0.5s ease-in-out; 
+        }
+        
+        .carousel-slide-hero { 
+            min-width: 100%; 
+            height: 100%; 
+            background-size: cover; 
+            background-position: center; 
+            position: relative; 
+            flex-shrink: 0;
+        }
+        
+        .hero-admin-panel { 
+            position: absolute; 
+            inset: 0; 
+            background: rgba(0,0,0,0.5); 
+            display: none; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 20px; 
+            opacity: 0; 
+            transition: 0.3s; 
+            z-index: 20; 
+        }
+        
+        .is-dev .hero-img:hover .hero-admin-panel { 
+            opacity: 1; 
+            display: flex; 
+        }
+        
+        .is-dev .hero-img::after { 
+            display: none !important; 
+        }
+        
+        .is-dev .hero-img { 
+            cursor: default; 
+        }
+
+        .gallery-thumb-container { 
+            display: flex; 
+            gap: 8px; 
+            overflow-x: auto; 
+            margin-top: 10px; 
+            padding-bottom: 5px; 
+            scrollbar-width: thin; 
+        }
+        
+        .gallery-thumb { 
+            width: 50px; 
+            height: 50px; 
+            border-radius: 4px; 
+            border: 1px solid var(--border-color); 
+            object-fit: cover; 
+            position: relative; 
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -1621,19 +1687,10 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="modal-admin-users">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3 class="serif"><i class="fa-solid fa-users-gear"></i> Usuários</h3>
-                <button type="button" class="btn-close" onclick="closeModal('modal-admin-users')"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="user-list-admin" id="admin-user-list"></div>
-        </div>
-    </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+    
     <script>
         let toastTimeout;
         
@@ -1693,7 +1750,6 @@
         let currentAdminTab = 'pendentes'; 
 
         // SDK MERCADO PAGO BRICKS (FRONTEND)
-        // Substitua pelo seu Public Key verdadeiro
         const mp = new MercadoPago('APP_USR-7e9bf431-c462-43d9-8e91-5d06f0d108da', { locale: 'pt-BR' }); 
         let bricksBuilder;
         let paymentBrickController;
