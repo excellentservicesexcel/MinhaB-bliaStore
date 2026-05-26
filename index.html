@@ -468,6 +468,21 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-pix-payment">
+        <div class="modal-content" style="max-width: 350px; padding: 40px; text-align: center;">
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Pagamento via PIX</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 20px;">Escaneie o QR Code ou copie o código abaixo para pagar no aplicativo do seu banco.</p>
+            
+            <img id="pix-qr-code" src="" style="width: 200px; height: 200px; margin: 0 auto 15px auto; border-radius: 8px; border: 1px solid var(--border-color); display: block;">
+            
+            <input type="text" id="pix-copy-text" class="input-modern" readonly style="font-size: 10px; text-align: center; margin-bottom: 10px; color: var(--text-light);">
+            
+            <button type="button" class="btn-outline" style="width: 100%; margin-bottom: 20px; font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="copyPixCode()"><i class="fa-regular fa-copy"></i> Copiar Código PIX</button>
+            
+            <button type="button" class="btn-gold" style="width: 100%; padding: 15px;" onclick="goToPixSuccess()">Já realizei o pagamento</button>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modal-product-details" onclick="closeModal('modal-product-details')">
         <div class="modal-content" style="max-width: 350px; padding: 0; overflow: hidden; border-radius: 12px; gap: 0;" onclick="event.stopPropagation()">
             <div style="position: relative;">
@@ -594,7 +609,6 @@
             <div class="user-list-admin" id="admin-orders-list" style="max-height: 70vh;"></div>
         </div>
     </div>
-
 
     <div class="modal-overlay" id="modal-form">
         <div class="modal-content">
@@ -1120,11 +1134,31 @@
                             .then(res => res.json())
                             .then(data => {
                                 hideLoading();
-                                resolve();
-                                if(data.status === 'approved' || data.status === 'in_process' || data.status === 'pending') {
+                                resolve(); // Libera o brick internamente
+                                
+                                if(data.status === 'approved' || data.status === 'in_process') {
+                                    // Pagamento direto no Cartão aprovado ou em análise curta
                                     closeModal('modal-payment-brick');
-                                    salvarPedidoAprovado(data.id, data.status);
-                                } else {
+                                    salvarPedidoStore(data.id, data.status);
+                                    document.getElementById('modal-post-pay-1').classList.add('active');
+                                } 
+                                else if (data.status === 'pending') {
+                                    // Cliente selecionou PIX (ou Boleto)
+                                    closeModal('modal-payment-brick');
+                                    salvarPedidoStore(data.id, data.status);
+                                    
+                                    // Se o servidor conseguiu capturar a imagem do QR Code do PIX
+                                    if(data.pix && data.pix.qr_code_base64) {
+                                        document.getElementById('pix-qr-code').src = 'data:image/jpeg;base64,' + data.pix.qr_code_base64;
+                                        document.getElementById('pix-copy-text').value = data.pix.qr_code;
+                                        document.getElementById('modal-pix-payment').classList.add('active');
+                                    } else {
+                                        // Caso seja boleto ou não tenha retornado a imagem do PIX, joga pra tela padrão
+                                        document.getElementById('modal-post-pay-1').classList.add('active');
+                                    }
+                                } 
+                                else {
+                                    // Falhou, recusado pelo banco, etc
                                     closeModal('modal-payment-brick');
                                     document.getElementById('modal-post-pay-error').classList.add('active');
                                 }
@@ -1146,7 +1180,8 @@
             window.paymentBrickController = await bricksBuilder.create('payment', 'paymentBrick_container', settings);
         };
 
-        function salvarPedidoAprovado(paymentId, status) {
+        // Função isolada para salvar o pedido no banco de dados sem abrir pop-ups
+        function salvarPedidoStore(paymentId, status) {
             const purchasedItems = userCart.filter(item => item.selected);
             const orderId = 'MB-' + Date.now().toString().slice(-6); 
             let totalVal = 0;
@@ -1178,9 +1213,25 @@
             if(document.getElementById('view-cart').classList.contains('active')) renderCartItems();
 
             localStorage.setItem('tempOrderId', orderId);
-            document.getElementById('modal-post-pay-1').classList.add('active');
         }
 
+        // --- FUNÇÕES DA NOVA TELA DO PIX ---
+        window.copyPixCode = function() {
+            const copyText = document.getElementById("pix-copy-text");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999); 
+            navigator.clipboard.writeText(copyText.value);
+            showMessage("Código PIX copiado!");
+        };
+
+        window.goToPixSuccess = function() {
+            document.getElementById('modal-pix-payment').classList.remove('active');
+            // Avança para perguntar o WhatsApp (etapa 2)
+            document.getElementById('post-pay-phone').value = activeUser.phone || '';
+            document.getElementById('modal-post-pay-2').classList.add('active');
+        };
+
+        // --- RESTANTE DAS FUNÇÕES DE NAVEGAÇÃO ---
         function closeErrorFlow() {
             document.getElementById('modal-post-pay-error').classList.remove('active');
             goHome();
