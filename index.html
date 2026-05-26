@@ -594,8 +594,8 @@
                 <circle cx="26" cy="26" r="25" fill="none"/>
                 <path fill="none" d="M16 16 L36 36 M36 16 L16 36"/>
             </svg>
-            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);">Compra não concluída</h3>
-            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;">Não foi possível validar o seu pagamento. Verifique os dados ou tente novamente mais tarde.</p>
+            <h3 class="serif" style="margin-bottom: 10px; color: var(--primary);" id="error-title">Compra não concluída</h3>
+            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 25px; line-height: 1.5;" id="error-desc">Não foi possível validar o seu pagamento. Verifique os dados ou tente novamente mais tarde.</p>
             <button type="button" class="btn-gold" style="width: 100%; padding: 15px; background: #d9534f;" onclick="closeErrorFlow()">Fechar</button>
         </div>
     </div>
@@ -719,7 +719,7 @@
 
         // SDK MERCADO PAGO BRICKS (FRONTEND)
         // ALERTA: Substitua a chave abaixo pela sua PUBLIC KEY verdadeira!
-        const mp = new MercadoPago('APP_USR-7e9bf431-c462-43d9-8e91-5d06f0d108da', { locale: 'pt-BR' });
+        const mp = new MercadoPago('SUA_PUBLIC_KEY_AQUI', { locale: 'pt-BR' });
         let bricksBuilder;
         let paymentBrickController;
 
@@ -1134,31 +1134,37 @@
                             .then(res => res.json())
                             .then(data => {
                                 hideLoading();
-                                resolve(); // Libera o brick internamente
+                                resolve(); 
                                 
                                 if(data.status === 'approved' || data.status === 'in_process') {
-                                    // Pagamento direto no Cartão aprovado ou em análise curta
                                     closeModal('modal-payment-brick');
                                     salvarPedidoStore(data.id, data.status);
                                     document.getElementById('modal-post-pay-1').classList.add('active');
                                 } 
                                 else if (data.status === 'pending') {
-                                    // Cliente selecionou PIX (ou Boleto)
                                     closeModal('modal-payment-brick');
                                     salvarPedidoStore(data.id, data.status);
                                     
-                                    // Se o servidor conseguiu capturar a imagem do QR Code do PIX
-                                    if(data.pix && data.pix.qr_code_base64) {
-                                        document.getElementById('pix-qr-code').src = 'data:image/jpeg;base64,' + data.pix.qr_code_base64;
-                                        document.getElementById('pix-copy-text').value = data.pix.qr_code;
-                                        document.getElementById('modal-pix-payment').classList.add('active');
+                                    // NOVO: Verifica estritamente se o QR Code veio para não dar falso positivo
+                                    if (formData.payment_method_id === 'pix') {
+                                        if(data.pix && data.pix.qr_code_base64) {
+                                            document.getElementById('pix-qr-code').src = 'data:image/jpeg;base64,' + data.pix.qr_code_base64;
+                                            document.getElementById('pix-copy-text').value = data.pix.qr_code;
+                                            document.getElementById('modal-pix-payment').classList.add('active');
+                                        } else {
+                                            // Se for PIX e a imagem falhou, AVISA O ERRO e bloqueia o falso sucesso
+                                            document.getElementById('error-title').innerText = "Erro ao gerar PIX";
+                                            document.getElementById('error-desc').innerText = "O servidor não devolveu o QR Code. Confirme se a Vercel concluiu a atualização do arquivo pagamento.js.";
+                                            document.getElementById('modal-post-pay-error').classList.add('active');
+                                        }
                                     } else {
-                                        // Caso seja boleto ou não tenha retornado a imagem do PIX, joga pra tela padrão
+                                        // Boleto ou lotérica
                                         document.getElementById('modal-post-pay-1').classList.add('active');
                                     }
                                 } 
                                 else {
-                                    // Falhou, recusado pelo banco, etc
+                                    document.getElementById('error-title').innerText = "Compra não concluída";
+                                    document.getElementById('error-desc').innerText = "Não foi possível validar o seu pagamento. Verifique os dados ou tente novamente mais tarde.";
                                     closeModal('modal-payment-brick');
                                     document.getElementById('modal-post-pay-error').classList.add('active');
                                 }
