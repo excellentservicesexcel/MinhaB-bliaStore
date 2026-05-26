@@ -1621,6 +1621,19 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-admin-users">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="serif"><i class="fa-solid fa-users-gear"></i> Usuários</h3>
+                <button type="button" class="btn-close" onclick="closeModal('modal-admin-users')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="user-list-admin" id="admin-user-list"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script>
         let toastTimeout;
         
