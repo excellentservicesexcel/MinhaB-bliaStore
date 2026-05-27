@@ -2799,17 +2799,23 @@
                         }); 
                     }
                     
-                    let contactHtml = ''; 
-                    const cleanPhone = o.phone ? o.phone.replace(/\D/g, '') : '';
-                    if(o.phone) { 
-                        if(o.whatsapp) { 
-                            contactHtml = `<a href="https://wa.me/55${cleanPhone}" target="_blank" class="btn-gold" style="padding:10px; font-size:10px; text-decoration:none; display:block; text-align:center; border-radius:4px;"><i class="fa-brands fa-whatsapp" style="font-size:14px; margin-right:5px;"></i> WhatsApp</a>`; 
-                        } else { 
-                            contactHtml = `<div style="display:flex; gap:10px;"><a href="tel:${cleanPhone}" class="btn-outline" style="padding:10px; font-size:10px; text-decoration:none; border-radius:4px; flex:1; text-align:center;"><i class="fa-solid fa-phone" style="margin-right:5px;"></i> Ligar</a></div>`; 
-                        } 
-                    } else { 
-                        contactHtml = `<p style="font-size:10px; color: #d9534f; text-align:center;">Sem contato</p>`; 
-                    }
+                    let labelHtml = '';
+if (o.status === 'approved') {
+    if (o.melhorEnvioPdf) {
+        labelHtml = `<a href="${o.melhorEnvioPdf}" target="_blank" class="btn-outline" style="padding:10px; font-size:10px; text-decoration:none; display:block; text-align:center; border-radius:4px; margin-bottom:8px; border-color:#4caf50; color:#4caf50;"><i class="fa-solid fa-file-arrow-down"></i> Baixar Etiqueta Correios</a>`;
+    } else {
+        labelHtml = `<button type="button" class="btn-outline" style="padding:10px; font-size:10px; width:100%; border-radius:4px; margin-bottom:8px; border-color:var(--accent); color:var(--accent);" onclick="gerarEtiquetaPainel('${o.orderId}')"><i class="fa-solid fa-truck-fast"></i> Gerar Etiqueta no Melhor Envio</button>`;
+    }
+}
+
+let contactHtml = ''; 
+const cleanPhone = o.phone ? o.phone.replace(/\D/g, '') : ''; 
+if(o.phone) { 
+    if(o.whatsapp) contactHtml = `${labelHtml}<a href="https://wa.me/55${cleanPhone}" target="_blank" class="btn-gold" style="padding:10px; font-size:10px; text-decoration:none; display:block; text-align:center; border-radius:4px;">WhatsApp</a>`; 
+    else contactHtml = `${labelHtml}<div style="display:flex; gap:10px;"><a href="tel:${cleanPhone}" class="btn-outline" style="padding:10px; font-size:10px; text-decoration:none; border-radius:4px; flex:1; text-align:center;">Ligar</a></div>`; 
+} else { 
+    contactHtml = `<p style="font-size:10px; color: #d9534f; text-align:center;">Sem contato</p>`; 
+}
                     
                     let actionsHtml = '';
                     if(tab === 'pendentes') {
@@ -3676,7 +3682,45 @@
                 } 
             } 
         }, 60000); 
-        
+
+    window.gerarEtiquetaPainel = function(orderId) {
+    if (!db) return;
+    showLoading("Conectando ao Melhor Envio...");
+    
+    db.ref('orders/' + orderId).once('value').then(snap => {
+        const orderData = snap.val();
+        if (!orderData) {
+            hideLoading();
+            showMessage("Erro ao ler dados da comanda.");
+            return;
+        }
+
+        fetch('/api/etiqueta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderData })
+        })
+        .then(res => res.json())
+        .then(data => {
+            hideLoading();
+            if (data.url) {
+                // Salva a URL do PDF diretamente na comanda no Firebase
+                db.ref('orders/' + orderId).update({ melhorEnvioPdf: data.url, melhorEnvioShipmentId: data.shipmentId }).then(() => {
+                    showMessage("Etiqueta gerada com sucesso!");
+                    openAdminOrders(currentAdminTab); // Atualiza a aba do painel
+                    window.open(data.url, '_blank'); // Abre o PDF automaticamente em outra aba
+                });
+            } else {
+                showMessage("O Melhor Envio não retornou o PDF. Verifique seu saldo.");
+            }
+        })
+        .catch(err => {
+            hideLoading();
+            console.error(err);
+            showMessage("Erro de conexão ao gerar a etiqueta.");
+        });
+    });
+};
         window.onload = checkSession;
 
     </script>
