@@ -1439,6 +1439,14 @@
       <h2 class="serif" style="font-size: 18px; color: var(--primary); text-transform: uppercase;">Minha Sacola</h2>
     </header>
     <div class="cart-container" id="cart-items-list" style="padding: 20px 5%; max-width: 800px; margin: 0 auto;"></div>
+    <div style="background: var(--surface); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); max-width: 800px; margin: 20px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+    <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 600; color: var(--primary);">Simular Frete</h4>
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <input type="text" id="cart-cep" class="input-modern" placeholder="Digite seu CEP (Ex: 18000-000)" style="margin: 0; padding: 12px; flex: 1;">
+        <button type="button" class="btn-gold" style="padding: 12px 20px; margin: 0; font-size: 11px;" onclick="calcularFreteLoja()">Calcular</button>
+    </div>
+    <div id="frete-options-container" style="display: flex; flex-direction: column; gap: 10px;"></div>
+</div>
     <div class="cart-floating-footer">
       <button type="button" class="btn-comprar-floating" onclick="processCheckout()">Finalizar Compra <i class="fa-solid fa-check" style="margin-left: 8px;"></i></button>
       <div class="floating-total-box">
@@ -2303,16 +2311,95 @@
             renderCartItems(); 
         }
         
-        function updateCartTotal() { 
-            let total = 0; 
-            userCart.forEach(item => { 
-                if(item.selected) { 
-                    const priceToParse = item.hasVariants ? item.selectedVariantData.price : item.price; 
-                    total += (parsePriceBR(priceToParse) * item.quantity); 
-                } 
-            }); 
-            document.getElementById('cart-total-display').innerText = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); 
+        // VARIÁVEIS GLOBAIS PARA CONTROLAR O FRETE
+let valorFreteSelecionado = 0;
+let nomeFreteSelecionado = "";
+
+function updateCartTotal() { 
+    let total = 0; 
+    userCart.forEach(item => { 
+        if(item.selected) { 
+            const priceToParse = item.hasVariants ? item.selectedVariantData.price : item.price; 
+            total += (parsePriceBR(priceToParse) * item.quantity); 
+        } 
+    }); 
+    
+    // Soma o frete escolhido ao valor total dos produtos
+    let totalComFrete = total + valorFreteSelecionado;
+    
+    document.getElementById('cart-total-display').innerText = totalComFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); 
+}
+
+// NOVA FUNÇÃO: FAZ A PONTE COM O ARQUIVO API/FRETE.JS E EXIBE AS OPÇÕES
+window.calcularFreteLoja = function() {
+    const cep = document.getElementById('cart-cep').value.trim();
+    if(!cep) { 
+        showMessage("Por favor, digite um CEP válido."); 
+        return; 
+    }
+    
+    showLoading("Buscando opções de envio...");
+    const container = document.getElementById('frete-options-container');
+    container.innerHTML = "";
+    
+    // Zera o frete anterior ao recalcular
+    valorFreteSelecionado = 0;
+    nomeFreteSelecionado = "";
+    updateCartTotal();
+
+    fetch('/api/frete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cepDestino: cep })
+    })
+    .then(res => res.json())
+    .then(data => {
+        hideLoading();
+        if(data.message) { 
+            showMessage(data.message); 
+            return; 
         }
+        
+        let html = "";
+        data.forEach(opcao => {
+            html += `
+                <label style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); cursor: pointer; font-size: 12px; transition: 0.2s; margin-bottom: 8px;">
+                    <span style="display: flex; align-items: center; gap: 10px; color: var(--primary);">
+                        <input type="radio" name="opcao-frete" style="accent-color: var(--accent);" onchange="selecionarOpcaoFrete(${opcao.preco}, '${opcao.nome}')">
+                        <span><strong>${opcao.nome}</strong> (Prazo: ${opcao.prazo} dias úteis)</span>
+                    </span>
+                    <span style="font-weight: bold; color: var(--accent);">R$ ${opcao.preco.toFixed(2).replace('.', ',')}</span>
+                </label>
+            `;
+        });
+        
+        // REGRA DE ENTREGA REGIONAL: Se o CEP iniciar com 180 ou 181 (Sorocaba e região), adiciona o motoboy fixo
+        if(cep.startsWith('180') || cep.startsWith('181')) {
+            html += `
+                <label style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(172, 136, 84, 0.05); cursor: pointer; font-size: 12px; transition: 0.2s; margin-bottom: 8px;">
+                    <span style="display: flex; align-items: center; gap: 10px; color: var(--primary);">
+                        <input type="radio" name="opcao-frete" style="accent-color: var(--accent);" onchange="selecionarOpcaoFrete(10.00, 'Entrega Local Motoboy')">
+                        <span><strong>Entrega por Motoboy / Uber Flash</strong> (Entrega Expressa no Mesmo Dia)</span>
+                    </span>
+                    <span style="font-weight: bold; color: var(--accent);">R$ 10,00</span>
+                </label>
+            `;
+        }
+
+        container.innerHTML = html;
+    })
+    .catch(err => {
+        hideLoading();
+        console.error(err);
+        showMessage("Não foi possível calcular o frete. Tente novamente.");
+    });
+};
+
+window.selecionarOpcaoFrete = function(preco, nome) {
+    valorFreteSelecionado = preco;
+    nomeFreteSelecionado = nome;
+    updateCartTotal(); 
+};
 
         // --- SISTEMA DE CHECKOUT E INTEGRAÇÃO MERCADO PAGO ---
         function toggleAuthCheck(view) { 
@@ -2511,43 +2598,48 @@
         };
 
         function salvarPedidoStore(paymentId, status) {
-            const purchasedItems = userCart.filter(item => item.selected);
-            const orderId = 'MB-' + Date.now().toString().slice(-6); 
-            let totalVal = 0;
-            
-            purchasedItems.forEach(i => { 
-                const price = i.hasVariants ? i.selectedVariantData.price : i.price; 
-                totalVal += (parsePriceBR(price) * i.quantity); 
-            });
-            
-            const totalFmt = totalVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const purchasedItems = userCart.filter(item => item.selected);
+    const orderId = 'MB-' + Date.now().toString().slice(-6); 
+    let totalVal = 0;
+    
+    purchasedItems.forEach(i => { 
+        const price = i.hasVariants ? i.selectedVariantData.price : i.price; 
+        totalVal += (parsePriceBR(price) * i.quantity); 
+    });
+    
+    // Linha atualizada para somar o frete ao total gravado na comanda
+    const totalFmt = (totalVal + valorFreteSelecionado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-            if(db) {
-                db.ref('orders/' + orderId).set({
-                    orderId: orderId, 
-                    userId: activeUser.username, 
-                    userName: activeUser.name, 
-                    items: purchasedItems, 
-                    total: totalFmt,
-                    timestamp: Date.now(), 
-                    phone: activeUser.phone || '', 
-                    whatsapp: true, 
-                    status: status, 
-                    paymentId: paymentId, 
-                    visibleToAdmin: true, 
-                    deliveryStatus: 'aguardando' // NOVO COMANDO: STATUS DE LOGÍSTICA
-                });
-            }
+    if(db) {
+        db.ref('orders/' + orderId).set({
+            orderId: orderId, 
+            userId: activeUser.username, 
+            userName: activeUser.name, 
+            items: purchasedItems, 
+            total: totalFmt,
+            timestamp: Date.now(), 
+            phone: activeUser.phone || '', 
+            whatsapp: true, 
+            status: status, 
+            paymentId: paymentId, 
+            visibleToAdmin: true, 
+            deliveryStatus: 'aguardando',
+            // Novos campos para registrar o frete no painel da loja
+            fretePago: valorFreteSelecionado,
+            tipoEnvio: nomeFreteSelecionado,
+            cepEntrega: document.getElementById('cart-cep').value ? document.getElementById('cart-cep').value.trim() : ''
+        });
+    }
 
-            userCart = userCart.filter(item => !item.selected);
-            saveCartToLocal(); 
-            updateCartBadges();
-            
-            if(document.getElementById('view-cart').classList.contains('active')) {
-                renderCartItems();
-            }
-            localStorage.setItem('tempOrderId', orderId);
-        }
+    userCart = userCart.filter(item => !item.selected);
+    saveCartToLocal(); 
+    updateCartBadges();
+    
+    if(document.getElementById('view-cart').classList.contains('active')) {
+        renderCartItems();
+    }
+    localStorage.setItem('tempOrderId', orderId);
+}
 
         window.copyPixCode = function() { 
             const copyText = document.getElementById("pix-copy-text"); 
