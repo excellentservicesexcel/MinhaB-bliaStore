@@ -3818,12 +3818,16 @@ if(o.phone) {
 
     </script>
     window.enviarAvisoWhatsApp = function(orderId, total, cliente) {
-    const telefone = "5515991422218"; // Ex: 5515991422218
-    const apiKey = "SUA_API_KEY_AQUI"; // A chave que o bot te enviou
-    const user = "SEU_USER_DO_BOT";    // O usuário que o bot te enviou
+    const telefone = "5515991422218"; // O seu número com 55 na frente
+    const apiKey = "1215893";         // A chave que ele te mandou
+    
+    // Para o CallMeBot, o "User" é o seu próprio número de telefone, 
+    // mas na URL que ele te passou, ele já está incluído no parâmetro 'phone'.
+    // Portanto, não precisa de uma variável 'user' separada!
     
     const mensagem = `🎉+Nova+venda!+Pedido+${orderId}+do+cliente+${cliente.replace(/\s+/g, '+')}+no+valor+de+${total.replace(/\s+/g, '+')}`;
     
+    // A URL correta usando os seus dados:
     fetch(`https://api.callmebot.com/whatsapp.php?phone=${telefone}&text=${mensagem}&apikey=${apiKey}`)
     .catch(err => console.error("Erro ao notificar no WhatsApp", err));
 };
