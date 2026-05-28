@@ -3816,7 +3816,6 @@ if(o.phone) {
 };
         window.onload = checkSession;
 
-    </script>
     window.enviarAvisoWhatsApp = function(orderId, total, cliente) {
     const telefone = "5515991422218"; // O seu número com 55 na frente
     const apiKey = "1215893";         // A chave que ele te mandou
@@ -3831,5 +3830,5 @@ if(o.phone) {
     fetch(`https://api.callmebot.com/whatsapp.php?phone=${telefone}&text=${mensagem}&apikey=${apiKey}`)
     .catch(err => console.error("Erro ao notificar no WhatsApp", err));
 };
-</body>
+</script> </body>
 </html>
