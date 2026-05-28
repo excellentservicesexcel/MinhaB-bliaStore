@@ -16,7 +16,7 @@ export default async function handler(req, res) {
         const URL_BASE = 'https://api.melhorenvio.com.br'; 
 
         // O CEP de onde as suas encomendas saem (Coloquei o genérico de Sorocaba, altere para o seu exato)
-        const CEP_ORIGEM = '18000000'; 
+        const CEP_ORIGEM = '18087179'; 
 
         const response = await fetch(`${URL_BASE}/api/v2/me/shipment/calculate`, {
             method: 'POST',
